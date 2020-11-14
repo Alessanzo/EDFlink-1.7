@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE properties SYSTEM "http://java.sun.com/dtd/properties.dtd">
+<properties>
+	<comment>This is easy!</comment>
+	<entry key="taskmanager_1.slotTypes">0,1,0,1</entry>
+	<entry key="taskmanager_2.slotTypes">2,1,0,2</entry>
+</properties>
