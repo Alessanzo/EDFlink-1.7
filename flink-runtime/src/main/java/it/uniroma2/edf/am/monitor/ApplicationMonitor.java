@@ -1,10 +1,12 @@
 package it.uniroma2.edf.am.monitor;
 
+import it.uniroma2.edf.EDFLogger;
 import it.uniroma2.edf.JobGraphUtils;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.EDFOptions;
 import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.jobgraph.JobVertex;
+import org.apache.flink.shaded.netty4.io.netty.handler.logging.LogLevel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import redis.clients.jedis.Jedis;
@@ -201,18 +203,41 @@ public class ApplicationMonitor {
 	}
 
 
-	private double getAvgLatencyUpToOperator (JobVertex operator)
+	public double getAvgLatencyUpToOperator (JobVertex operator)
 	{
-		double latency = 0.0;
+		double operatorLatencySum = 0.0;
+		int numSubtask = operator.getParallelism();
+		if (numSubtask == 0) return operatorLatencySum;
+		for (int subtaskId=0; subtaskId<numSubtask; subtaskId++) {
+			String key = String.format("latency.%s.*", jobGraph.getName());
+			ScanParams scanParams = new ScanParams().match(key);
+			String cur = SCAN_POINTER_START;
+			double subtaskLatencySum = 0.0;
+			int numSubtaskLatencies = 0;
+			do {
+				ScanResult<String> scanResult = jedis.scan(cur, scanParams);
 
-		/* Find max latency up to operator subtasks */
-		Map<Integer, Double> entries = operator2subtasksLatency.get(operator.getName());
-		for (Double val : entries.values()) {
-			latency += val;
+				// work with result
+				for (String singleKey : scanResult.getResult()) {
+					//subtaskLatencySum += Double.parseDouble(singleKey);
+					//numSubtaskLatencies++;
+					String pattern = String.format("%s.%s", operator.getID(), subtaskId);
+					//EDFLogger.log("EDF: result è " + singleKey + " e pattern " + pattern, LogLevel.INFO, ApplicationMonitor.class);
+					if (singleKey.contains(pattern)){
+						String value = jedis.get(singleKey);
+						//EDFLogger.log("EDF: " + value, LogLevel.INFO, ApplicationMonitor.class);
+						subtaskLatencySum += Double.parseDouble(value);
+						numSubtaskLatencies++;
+					}
+				}
+				cur = scanResult.getCursor();
+			} while (!cur.equals(SCAN_POINTER_START));
+			EDFLogger.log("EDF: found " + numSubtaskLatencies + " latency entries for subtask number " + subtaskId, LogLevel.INFO, ApplicationMonitor.class);
+			if(numSubtaskLatencies != 0) operatorLatencySum += (subtaskLatencySum / numSubtaskLatencies);
 		}
-		latency /= entries.size();
+		EDFLogger.log("EDF: found " + numSubtask + " subtasks for operator " + operator.getName(), LogLevel.INFO, ApplicationMonitor.class);
+		return (operatorLatencySum/numSubtask);
 
-		return latency;
 	}
 
 	public double getAvgOperatorLatency (JobVertex operator) {

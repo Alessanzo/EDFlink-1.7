@@ -1,9 +1,11 @@
 package it.uniroma2.edf.metrics;
 
+import it.uniroma2.edf.EDFLogger;
 import org.apache.flink.metrics.*;
 import org.apache.flink.metrics.reporter.MetricReporter;
 import org.apache.flink.metrics.reporter.Scheduled;
 import org.apache.flink.runtime.metrics.MetricNames;
+import org.apache.flink.shaded.netty4.io.netty.handler.logging.LogLevel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import redis.clients.jedis.Jedis;
@@ -35,6 +37,7 @@ public class RedisMetricsReporter implements MetricReporter, Scheduled {
 	public void open(MetricConfig metricConfig) {
 		jedis = new Jedis("redis", 6379);
 		publishOnRedis = true;
+		if (jedis != null) EDFLogger.log("EDF: Redis Metric Reporter Connected to Redis!", LogLevel.INFO, RedisMetricsReporter.class);
 		/*
 		String redisHostname = metricConfig.getString(CONF_REDIS_HOST, "");
 		publishOnRedis = !redisHostname.isEmpty();
@@ -42,9 +45,10 @@ public class RedisMetricsReporter implements MetricReporter, Scheduled {
 			int redisPort = metricConfig.getInteger(CONF_REDIS_PORT, 6379);
 			jedis = new Jedis(redisHostname, redisPort);
 		}
-
-		logEverything = metricConfig.getBoolean(CONF_LOG_EVERYTHING, false);
 		*/
+		//logEverything = metricConfig.getBoolean(CONF_LOG_EVERYTHING, false);
+
+
 	}
 
 	@Override
@@ -196,12 +200,28 @@ public class RedisMetricsReporter implements MetricReporter, Scheduled {
 		// Format: <hostname>.taskmanager.<tmid>.<jobid>.latency.source_id.<source_id>.
 		// source_subtask_index.<src_subtask>.operator_id.<operatorid>.operator_subtask_id.<subtaskid>.<metric>
 		String fields[] = metricId.split("\\.");
+		/*
+		EDFLogger.log("EDF: metricId " + metricId, LogLevel.INFO, RedisMetricsReporter.class);
+		for (String field: fields){
+			EDFLogger.log("EDF: campo dell latenza :" + field, LogLevel.INFO, RedisMetricsReporter.class);
+		}
+		*/
 
 		final String jobId = fields[3];
 		final String sourceId = fields[6];
-		final String sourceSubtaskId = fields[8];
-		final String operator = fields[10];
-		final String subtaskId = fields[12];
+		String operator;
+		String subtaskId;
+		String sourceSubtaskId;
+		if (fields.length == 12){
+			sourceSubtaskId = String.valueOf(0);
+			operator = fields[8];
+			subtaskId = fields[10];
+		}
+		else {
+			sourceSubtaskId = fields[8];
+			operator = fields[10];
+			subtaskId = fields[12];
+		}
 
 		if (publishOnRedis) {
 			String key = String.format("latency.%s.%s.%s.%s.%s", jobId, sourceId, sourceSubtaskId, operator, subtaskId);

@@ -560,10 +560,14 @@ public class SlotManager implements AutoCloseable {
 		}
 
 		if (bestCandidate == null) EDFLogger.log("EDF: NON CI SONO SLOT DISPONIBILI NEL RM", LogLevel.INFO, SlotManager.class);
-		else if (bestCandidate.getResourceProfile().getResourceType() > requestType)
+		else if (bestCandidate.getResourceProfile().getResourceType() > requestType) {
 			EDFLogger.log("EDF: Lo Slot allocato nel RM non matcha, ma ha un tipo maggiore", LogLevel.INFO, SlotManager.class);
-		else EDFLogger.log("EDF: Lo Slot allocato nel RM non matcha", LogLevel.INFO, SlotManager.class);
-
+			freeSlots.remove(bestCandidate.getSlotId());
+		}
+		else {
+			EDFLogger.log("EDF: Lo Slot allocato nel RM non matcha", LogLevel.INFO, SlotManager.class);
+			freeSlots.remove(bestCandidate.getSlotId());
+		}
 		return bestCandidate;
 		//return null;
 	}

@@ -33,6 +33,7 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.net.URL;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
@@ -291,6 +292,7 @@ public class JobGraph implements Serializable {
 		JobVertex previous = taskVertices.put(id, vertex);
 
 		//EDF
+
 		Integer[] arr = new Integer[vertex.getParallelism()];
 		Arrays.fill(arr, 1);
 		ArrayList<Integer> resList = new ArrayList<>();

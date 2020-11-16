@@ -1,6 +1,7 @@
 package it.uniroma2.edf.am;
 
 //import it.uniroma2.edf.am.monitor.ApplicationMonitor;
+import it.uniroma2.edf.EDFLogger;
 import it.uniroma2.edf.JobGraphUtils;
 import it.uniroma2.edf.am.execute.GlobalActuator;
 import it.uniroma2.edf.am.monitor.ApplicationMonitor;
@@ -10,6 +11,7 @@ import org.apache.flink.configuration.EDFOptions;
 import org.apache.flink.runtime.dispatcher.Dispatcher;
 import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.jobgraph.JobStatus;
+import org.apache.flink.shaded.netty4.io.netty.handler.logging.LogLevel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -77,7 +79,7 @@ public class ApplicationManager implements Runnable {
 	protected void initialize()
 	{
 		LOG.info("AM: INITIALIZED!(modified)");
-		//appMonitor = new ApplicationMonitor(jobGraph, config);
+		appMonitor = new ApplicationMonitor(jobGraph, config);
 	}
 
 	@Override
@@ -150,8 +152,11 @@ public class ApplicationManager implements Runnable {
 		//jobGraph.getVertices().forEach(jobVertex -> LOG.info("vertextostring " + jobVertex.toString()));
 		JobGraphUtils.listUpstreamOperators(jobGraph, jobGraph.getVerticesAsArray()[1]).forEach(jobVertex -> LOG.info("upstreamtostirng "+jobVertex.toString()));
 		//double ir = appMonitor.getSubtaskInputRate(JobGraphUtils.listOperators(jobGraph, true,true).iterator().next().getOperatorName(),String.valueOf(0));
-		//double ir = appMonitor.getSubtaskInputRate(jobGraph.getVerticesAsArray()[1].getName(),String.valueOf(0));
-		LOG.info("INPUT RATEEE " + ir);
+		double ir = appMonitor.getSubtaskInputRate(jobGraph.getVerticesAsArray()[1].getName(),String.valueOf(0));
+		EDFLogger.log("EDF: Input Rate: " + ir, LogLevel.INFO, ApplicationManager.class);
+		double operatorLatency = appMonitor.getAvgLatencyUpToOperator(jobGraph.getVerticesAsArray()[1]);
+		//double operatorLatency = appMonitor.prova(jobGraph.getVerticesAsArray()[1]);
+		EDFLogger.log("EDF: operatorLatency: " + operatorLatency, LogLevel.INFO, ApplicationManager.class);
 		this.oldir = this.ir;
 		this.ir = ir;
 	}
