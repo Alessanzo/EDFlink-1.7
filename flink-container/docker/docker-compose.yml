@@ -25,7 +25,9 @@
 # * FLINK_JOB_ARGUMENTS - Additional arguments which will be passed to the job cluster (default: none)
 # * SAVEPOINT_OPTIONS - Savepoint options to start the cluster with (default: none)
 
-version: "2.0"
+
+
+version: "2.1"
 services:
   job-cluster:
     image: ${FLINK_DOCKER_IMAGE_NAME:-flink-job}
@@ -33,15 +35,20 @@ services:
       - "8081:8081"
     command: job-cluster --job-classname ${FLINK_JOB} -Djobmanager.rpc.address=job-cluster -Dparallelism.default=${DEFAULT_PARALLELISM:-2} ${SAVEPOINT_OPTIONS} --port 12345 --hostname 192.168.1.14
 
+
   taskmanager_1:
     image: ${FLINK_DOCKER_IMAGE_NAME:-flink-job}
     command: task-manager -Djobmanager.rpc.address=job-cluster
-    scale: ${DEFAULT_PARALLELISM:-1}
+    depends_on:
+    - job-cluster
+    #scale: ${DEFAULT_PARALLELISM:-1}
 
   taskmanager_2:
     image: ${FLINK_DOCKER_IMAGE_NAME:-flink-job}
     command: task-manager -Djobmanager.rpc.address=job-cluster
-    scale: ${DEFAULT_PARALLELISM:-1}
+    depends_on:
+    - job-cluster
+    #scale: ${DEFAULT_PARALLELISM:-1}
 
   redis:
     image: "redis:alpine"

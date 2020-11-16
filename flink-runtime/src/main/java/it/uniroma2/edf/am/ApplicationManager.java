@@ -158,14 +158,21 @@ public class ApplicationManager implements Runnable {
 
 	protected void analyze() {
 		LOG.info("ANALYZE - parallelism: " +jobGraph.getVerticesAsArray()[1].getParallelism());
+		LOG.info("ANALYZE - parallelism: " +jobGraph.getVerticesAsArray()[2].getParallelism());
 	}
 
 	protected void plan(int round) {
-		if(round == 6){
+		if(round == 4){
 			ArrayList<Integer> resTypes = this.jobGraph.getTaskResTypes().get((jobGraph.getVerticesAsArray()[1].getID()));
 			resTypes.add(0);
 			this.jobGraph.getTaskResTypes().put(jobGraph.getVerticesAsArray()[1].getID(),resTypes);
 			this.request.put(jobGraph.getVerticesAsArray()[1].getID().toString(), 3);
+		}
+		else if(round == 8){
+			ArrayList<Integer> resTypes = this.jobGraph.getTaskResTypes().get((jobGraph.getVerticesAsArray()[2].getID()));
+			resTypes.add(1);
+			this.jobGraph.getTaskResTypes().put(jobGraph.getVerticesAsArray()[2].getID(),resTypes);
+			this.request.put(jobGraph.getVerticesAsArray()[2].getID().toString(), 3);
 		}
 		//else if(round == 12){
 		//	this.request.put(jobGraph.getVerticesAsArray()[1].getID().toString(), 2);

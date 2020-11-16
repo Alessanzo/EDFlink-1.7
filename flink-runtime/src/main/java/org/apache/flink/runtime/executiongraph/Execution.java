@@ -481,8 +481,8 @@ public class Execution implements AccessExecution, Archiveable<ArchivedExecution
 		HashMap<JobVertexID, ArrayList<Integer>> taskResTypes = vertex.getExecutionGraph().getTaskResTypes();
 		ArrayList<Integer> resTypesArray = taskResTypes.get(vertex.getJobvertexId());
 		int thisTaskResType = resTypesArray.get(vertex.getParallelSubtaskIndex());
-		EDFLogger.log("EDF: Task del Vertex " + vertex.getJobVertex() + "numero " + vertex.getParallelSubtaskIndex()
-		+ "richiede un ResourceProfile del tipo " + thisTaskResType, LogLevel.INFO, Execution.class);
+		EDFLogger.log("EDF: Task del Vertex " + vertex.getTaskNameWithSubtaskIndex() +
+			" richiede un ResourceProfile del tipo " + thisTaskResType, LogLevel.INFO, Execution.class);
 
 		// sanity check
 		if (locationConstraint != null && sharingGroup == null) {

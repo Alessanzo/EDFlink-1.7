@@ -471,10 +471,13 @@ public class ExecutionVertex implements AccessExecutionVertex, Archiveable<Archi
 	 */
 	public Collection<CompletableFuture<TaskManagerLocation>> getPreferredLocations() {
 		Collection<CompletableFuture<TaskManagerLocation>> basedOnState = getPreferredLocationsBasedOnState();
+		/*
 		if(basedOnState != null) EDFLogger.log("EDF: Questo Task ha Location Preferences basate sullo stato!",
 			LogLevel.INFO, ExecutionVertex.class);
 		else EDFLogger.log("EDF: Questo Task NON ha Location Preferences basate sullo stato",
 			LogLevel.INFO, ExecutionVertex.class);
+
+		 */
 		return basedOnState != null ? basedOnState : getPreferredLocationsBasedOnInputs();
 	}
 

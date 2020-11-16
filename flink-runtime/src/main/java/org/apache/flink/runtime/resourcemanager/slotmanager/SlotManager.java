@@ -516,8 +516,8 @@ public class SlotManager implements AutoCloseable {
 		Iterator<Map.Entry<SlotID, TaskManagerSlot>> iterator = freeSlots.entrySet().iterator();
 
 		TaskManagerSlot bestCandidate = null;
-		int candidateType;
-		int requestType;
+		int candidateType = -1;
+		int requestType = requestResourceProfile.getResourceType();
 		while (iterator.hasNext()) {
 			TaskManagerSlot taskManagerSlot = iterator.next().getValue();
 
@@ -528,10 +528,10 @@ public class SlotManager implements AutoCloseable {
 				taskManagerSlot.getSlotId(), taskManagerSlot.getState());
 
 			candidateType = taskManagerSlot.getResourceProfile().getResourceType();
-			requestType = requestResourceProfile.getResourceType();
 
 			if (taskManagerSlot.getResourceProfile().isMatching(requestResourceProfile)) {
 				if (candidateType == requestType) {
+					EDFLogger.log("EDF: Lo Slot allocato nel RM matcha!", LogLevel.INFO, SlotManager.class);
 					iterator.remove();
 					return taskManagerSlot;
 				}
@@ -558,6 +558,12 @@ public class SlotManager implements AutoCloseable {
 			}
 			*/
 		}
+
+		if (bestCandidate == null) EDFLogger.log("EDF: NON CI SONO SLOT DISPONIBILI NEL RM", LogLevel.INFO, SlotManager.class);
+		else if (bestCandidate.getResourceProfile().getResourceType() > requestType)
+			EDFLogger.log("EDF: Lo Slot allocato nel RM non matcha, ma ha un tipo maggiore", LogLevel.INFO, SlotManager.class);
+		else EDFLogger.log("EDF: Lo Slot allocato nel RM non matcha", LogLevel.INFO, SlotManager.class);
+
 		return bestCandidate;
 		//return null;
 	}
