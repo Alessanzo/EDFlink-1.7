@@ -38,14 +38,14 @@ services:
 
   taskmanager_1:
     image: ${FLINK_DOCKER_IMAGE_NAME:-flink-job}
-    command: task-manager -Djobmanager.rpc.address=job-cluster
+    command: task-manager -Djobmanager.rpc.address=job-cluster -DresType=0
     depends_on:
     - job-cluster
     #scale: ${DEFAULT_PARALLELISM:-1}
 
   taskmanager_2:
     image: ${FLINK_DOCKER_IMAGE_NAME:-flink-job}
-    command: task-manager -Djobmanager.rpc.address=job-cluster
+    command: task-manager -Djobmanager.rpc.address=job-cluster -DresType=1
     depends_on:
     - job-cluster
     #scale: ${DEFAULT_PARALLELISM:-1}

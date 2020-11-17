@@ -41,15 +41,13 @@ import org.apache.flink.util.NetUtils;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import scala.Array;
 import scala.Predef;
 
 import java.io.FileInputStream;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.Optional;
-import java.util.Properties;
+import java.util.*;
 
 import static org.apache.flink.configuration.MemorySize.MemoryUnit.MEGA_BYTES;
 import static org.apache.flink.util.MathUtils.checkedDownCast;
@@ -234,9 +232,25 @@ public class TaskManagerServicesConfiguration {
 		//EDF
 		String name = EDFUtils.createRandomName();
 		EDFLogger.log("EDF TaskManager Name: " + name, LogLevel.INFO, TaskManagerServicesConfiguration.class);
-		String key = String.format("%s.slotTypes",name);
-		String value = taskManagerSlotTypes.get(key);
-		String[] slotTypes = value.split(",");
+
+		//SE PASSO LA RISORSA PER OGNI SLOT DALL'ATTRIBUTO
+		//String key = String.format("%s.slotTypes",name);
+		//String value = taskManagerSlotTypes.get(key);
+		//String[] slotTypes = value.split(",");
+
+		//SE PASSO LA RISORSA DA LINEA DI COMANDO
+		int globalResType = configuration.getResType();
+		String[] slotTypes;
+		if (globalResType != -1)
+			slotTypes = new String[]{String.valueOf(globalResType)};
+		else{ //SE PASSO LA RISORSA PER OGNI SLOT DALL'ATTRIBUTO
+			String key = String.format("%s.slotTypes",name);
+			String value = taskManagerSlotTypes.get(key);
+			slotTypes = value.split(",");
+		}
+
+		//String[] slotTypes = new String[]{"0", "0", "0", "0"};
+		//Arrays.fill(slotTypes, String.valueOf(configuration.getResType()));
 		/*
 		String propertyKey = String.format("%s.slotTypes",EDFUtils.createRandomName());
 		final Properties properties = new Properties();

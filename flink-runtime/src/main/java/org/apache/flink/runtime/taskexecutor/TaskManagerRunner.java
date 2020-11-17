@@ -18,6 +18,7 @@
 
 package org.apache.flink.runtime.taskexecutor;
 
+import it.uniroma2.edf.EDFLogger;
 import org.apache.flink.api.common.time.Time;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.ConfigurationUtils;
@@ -52,6 +53,7 @@ import org.apache.flink.runtime.util.Hardware;
 import org.apache.flink.runtime.util.JvmShutdownSafeguard;
 import org.apache.flink.runtime.util.LeaderRetrievalUtils;
 import org.apache.flink.runtime.util.SignalHandler;
+import org.apache.flink.shaded.netty4.io.netty.handler.logging.LogLevel;
 import org.apache.flink.util.AutoCloseableAsync;
 import org.apache.flink.util.ExceptionUtils;
 import org.apache.flink.util.ExecutorUtils;
@@ -285,6 +287,11 @@ public class TaskManagerRunner implements FatalErrorHandler, AutoCloseableAsync 
 		}
 
 		final Configuration configuration = loadConfiguration(args);
+		//EDF
+		for (String arg: args){
+			if (arg.contains("resType"))
+				configuration.setResType(Integer.parseInt(arg.split("=")[1]));
+		}
 
 		try {
 			FileSystem.initialize(configuration);
@@ -354,6 +361,7 @@ public class TaskManagerRunner implements FatalErrorHandler, AutoCloseableAsync 
 		checkNotNull(highAvailabilityServices);
 
 		LOG.info("Starting TaskManager with ResourceID: {}", resourceID);
+		EDFLogger.log("EDF: Proprietà di sistema: " + System.getProperty("resType"), LogLevel.INFO, TaskManagerRunner.class);
 
 
 		InetAddress remoteAddress = InetAddress.getByName(rpcService.getAddress());

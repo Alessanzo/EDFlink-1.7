@@ -44,6 +44,11 @@ import java.util.Set;
 public class Configuration extends ExecutionConfig.GlobalJobParameters
 		implements IOReadableWritable, java.io.Serializable, Cloneable {
 
+	//EDF
+	private int resType = -1;
+	public int getResType(){ return resType;}
+	public void setResType(int resType){ this.resType = resType;}
+
 	private static final long serialVersionUID = 1L;
 
 	private static final byte TYPE_STRING = 0;

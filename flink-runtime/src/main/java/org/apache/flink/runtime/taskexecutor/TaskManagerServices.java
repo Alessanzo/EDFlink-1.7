@@ -253,7 +253,14 @@ public class TaskManagerServices {
 
 		for (int i = 0; i < taskManagerServicesConfiguration.getNumberOfSlots(); i++) {
 			//int j = i%2;
-			int restype = Integer.parseInt(taskManagerServicesConfiguration.getSlotTypes()[i]);
+			int restype;
+			//se c'è un solo elemento, o c'è un solo taskSlot, o tutti devono avere la stessa Risorsa
+			if (taskManagerServicesConfiguration.getSlotTypes().length == 1){
+				restype = Integer.parseInt(taskManagerServicesConfiguration.getSlotTypes()[0]);
+			}
+			else{
+				restype = Integer.parseInt(taskManagerServicesConfiguration.getSlotTypes()[i]);
+			}
 			resourceProfiles.add(i, ResourceProfile.getAny(restype));
 			//resourceProfiles.add(i, ResourceProfile.getAny(j));
 		}
