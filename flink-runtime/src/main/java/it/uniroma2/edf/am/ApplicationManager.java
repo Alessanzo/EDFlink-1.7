@@ -154,9 +154,16 @@ public class ApplicationManager implements Runnable {
 		//double ir = appMonitor.getSubtaskInputRate(JobGraphUtils.listOperators(jobGraph, true,true).iterator().next().getOperatorName(),String.valueOf(0));
 		double ir = appMonitor.getSubtaskInputRate(jobGraph.getVerticesAsArray()[1].getName(),String.valueOf(0));
 		EDFLogger.log("EDF: Input Rate: " + ir, LogLevel.INFO, ApplicationManager.class);
+		double operatorIr = appMonitor.getOperatorInputRate(jobGraph.getVerticesAsArray()[1].getName());
+		double appIr = appMonitor.getApplicationInputRate();
 		double operatorLatency = appMonitor.getAvgLatencyUpToOperator(jobGraph.getVerticesAsArray()[1]);
-		//double operatorLatency = appMonitor.prova(jobGraph.getVerticesAsArray()[1]);
+		double avgOperatorLatency = appMonitor.getAvgOperatorLatency(jobGraph.getVerticesAsArray()[1]);
+		double processingTime = appMonitor.getAvgOperatorProcessingTime(jobGraph.getVerticesAsArray()[1].getName());
+		EDFLogger.log("EDF: operator Input Rate: " + operatorIr, LogLevel.INFO, ApplicationManager.class);
+		EDFLogger.log("EDF: application Input Rate: " + appIr, LogLevel.INFO, ApplicationManager.class);
 		EDFLogger.log("EDF: operatorLatency: " + operatorLatency, LogLevel.INFO, ApplicationManager.class);
+		EDFLogger.log("EDF: avgOperatorLatency: " + avgOperatorLatency, LogLevel.INFO, ApplicationManager.class);
+		EDFLogger.log("EDF: processingTime: " + processingTime, LogLevel.INFO, ApplicationManager.class);
 		this.oldir = this.ir;
 		this.ir = ir;
 	}

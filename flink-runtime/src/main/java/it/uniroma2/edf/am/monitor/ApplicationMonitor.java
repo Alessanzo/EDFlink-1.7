@@ -14,6 +14,7 @@ import redis.clients.jedis.ScanParams;
 import redis.clients.jedis.ScanResult;
 
 import java.util.*;
+import java.util.concurrent.atomic.DoubleAccumulator;
 
 import static java.lang.Double.max;
 import static redis.clients.jedis.ScanParams.SCAN_POINTER_START;
@@ -39,8 +40,6 @@ public class ApplicationMonitor {
 
 	/* Statistics */
 	private Map<String, Map<Integer, Double>> operator2subtasksThroughput = new HashMap<>();
-	private Map<String, Map<Integer, Double>> operator2subtasksProcessingTime = new HashMap<>();
-	private Map<String, Map<Integer, Double>> operator2subtasksLatency = new HashMap<>();
 
 	public ApplicationMonitor(JobGraph jobGraph, Configuration configuration)
 	{
@@ -84,7 +83,7 @@ public class ApplicationMonitor {
 	}
 
 	public double getOperatorInputRate(String operator) {
-		String key = String.format("inputRate.%s.%s.", jobGraph.getName(), operator);
+		String key = String.format("inputRate.%s.%s.*", jobGraph.getName(), operator);
 		ScanParams scanParams = new ScanParams().match(key);
 		String cur = SCAN_POINTER_START;
 		double inputRatesSum = 0.0;
@@ -92,7 +91,8 @@ public class ApplicationMonitor {
 			ScanResult<String> scanResult = jedis.scan(cur, scanParams);
 
 			// work with result
-			for (String value: scanResult.getResult()){
+			for (String singleKey: scanResult.getResult()){
+				String value = jedis.get(singleKey);
 				inputRatesSum += Double.parseDouble(value);
 			}
 			cur = scanResult.getCursor();
@@ -100,10 +100,9 @@ public class ApplicationMonitor {
 		return inputRatesSum;
 	}
 
-	@Deprecated
 	public double getApplicationInputRate()
 	{
-		String key = String.format("inputRate.%s.", jobGraph.getName());
+		String key = String.format("inputRate.%s.*", jobGraph.getName());
 		ScanParams scanParams = new ScanParams().match(key);
 		String cur = SCAN_POINTER_START;
 		double inputRatesSum = 0.0;
@@ -111,7 +110,8 @@ public class ApplicationMonitor {
 			ScanResult<String> scanResult = jedis.scan(cur, scanParams);
 
 			// work with result
-			for (String value: scanResult.getResult()){
+			for (String singleKey: scanResult.getResult()){
+				String value = jedis.get(singleKey);
 				inputRatesSum += Double.parseDouble(value);
 			}
 			cur = scanResult.getCursor();
@@ -136,10 +136,9 @@ public class ApplicationMonitor {
 		return rate;
 	}
 
-	@Deprecated
 	public double getAvgOperatorProcessingTime (String operator)
 	{
-		String key = String.format("executionTime.%s.%s.", jobGraph.getName(), operator);
+		String key = String.format("executionTime.%s.%s.*", jobGraph.getName(), operator);
 		ScanParams scanParams = new ScanParams().match(key);
 		String cur = SCAN_POINTER_START;
 		double executionTimeSum = 0.0;
@@ -148,9 +147,12 @@ public class ApplicationMonitor {
 			ScanResult<String> scanResult = jedis.scan(cur, scanParams);
 
 			// work with result
-			for (String value: scanResult.getResult()){
-				executionTimeSum += Double.parseDouble(value);
-				subTaskCount++;
+			for (String singleKey: scanResult.getResult()){
+				Double value = Double.parseDouble(jedis.get(singleKey));
+				if (!value.isNaN()) {
+					executionTimeSum += value;
+					subTaskCount++;
+				}
 			}
 			cur = scanResult.getCursor();
 		} while (!cur.equals(SCAN_POINTER_START));
@@ -202,7 +204,39 @@ public class ApplicationMonitor {
 		return app_latency;
 	}
 
+	public double getAvgLatencyUpToOperator (JobVertex operator)
+	{
+		double operatorLatencySum = 0.0;
+		int numSubtask = operator.getParallelism();
+		HashMap<Integer, Double[]> subtaskLatencies = new HashMap<>();
+		for (int subtaskId=0; subtaskId<= numSubtask; subtaskId++)
+			subtaskLatencies.put(subtaskId, new Double[]{0.0, 0.0});
 
+		String key = String.format("latency.%s.%s.*", jobGraph.getName(), operator.getID());
+		ScanParams scanParams = new ScanParams().match(key);
+		String cur = SCAN_POINTER_START;
+		do {
+			ScanResult<String> scanResult = jedis.scan(cur, scanParams);
+
+			// work with result
+			for (String singleKey : scanResult.getResult()) {
+				String value = jedis.get(singleKey);
+				String[] fields = singleKey.split("\\.");
+				//EDFLogger.log("EDF: Latency key: "+ singleKey + "Latency value: " + value + " Latency fields: " + fields[3], LogLevel.INFO, ApplicationMonitor.class);
+				Double[] subtaskLatencySum = subtaskLatencies.get(Integer.parseInt(fields[3]));
+				//EDFLogger.log("EDF: Latency sum " + subtaskLatencySum, LogLevel.INFO, ApplicationMonitor.class);
+				subtaskLatencySum[0]++;
+				subtaskLatencySum[1]+= Double.parseDouble(value);
+			}
+			cur = scanResult.getCursor();
+		} while (!cur.equals(SCAN_POINTER_START));
+		for (Double[] elem : subtaskLatencies.values()) {
+			if (elem[0]!=0.0) operatorLatencySum += (elem[1] / elem[0]);
+		}
+		return (operatorLatencySum/numSubtask);
+	}
+
+    /*
 	public double getAvgLatencyUpToOperator (JobVertex operator)
 	{
 		double operatorLatencySum = 0.0;
@@ -239,6 +273,8 @@ public class ApplicationMonitor {
 		return (operatorLatencySum/numSubtask);
 
 	}
+
+     */
 
 	public double getAvgOperatorLatency (JobVertex operator) {
 		/* QT(op) = max_subtask(QT(op,subtask)) - max_upstream(latency_up_to(upstream) */
@@ -282,22 +318,5 @@ public class ApplicationMonitor {
 		}
 	}
 
-	public void updateLatencyUpToOperator(String operator, int subtaskId, double value) {
-		if (!operator2subtasksLatency.containsKey(operator)) {
-			operator2subtasksLatency.put(operator, new HashMap<>());
-		}
-
-		operator2subtasksLatency.get(operator).put(subtaskId, value);
-		//LOG.info("Reported latency {}->{}: {}ms", srcId, operatorId, value);
-	}
-
-	public void updateOperatorThroughput(String operator, int subtaskId, double value) {
-		if (!operator2subtasksThroughput.containsKey(operator)) {
-			operator2subtasksThroughput.put(operator, new HashMap<>());
-		}
-
-		operator2subtasksThroughput.get(operator).put(subtaskId, value);
-		//LOG.info("Output rate for {}-{} = {} tps", operatorId, subtaskId, value);
-	}
 
 }

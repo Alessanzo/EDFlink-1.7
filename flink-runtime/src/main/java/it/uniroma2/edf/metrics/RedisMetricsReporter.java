@@ -224,7 +224,8 @@ public class RedisMetricsReporter implements MetricReporter, Scheduled {
 		}
 
 		if (publishOnRedis) {
-			String key = String.format("latency.%s.%s.%s.%s.%s", jobId, sourceId, sourceSubtaskId, operator, subtaskId);
+			//String key = String.format("latency.%s.%s.%s.%s.%s", jobId, sourceId, sourceSubtaskId, operator, subtaskId);
+			String key = String.format("latency.%s.%s.%s.%s.%s", jobId, operator, subtaskId, sourceId, sourceSubtaskId);
 			jedis.set(key, String.valueOf(stats.getMean()));
 			// TODO getQuantile(0.99) ....
 		} else {
