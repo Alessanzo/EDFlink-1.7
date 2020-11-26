@@ -226,6 +226,12 @@ under the License.
 			<scope>compile</scope>
 		</dependency>
 
+		<dependency>
+			<groupId>com.EDF.uniroma2</groupId>
+			<artifactId>policies-EDF</artifactId>
+			<version>1.0</version>
+		</dependency>
+
 		<!--
 		The KryoSerializer dynamically loads Kryo instances via Chill and requires that Chill
 		is in the classpath. Because we do not want to have transitive Scala dependencies

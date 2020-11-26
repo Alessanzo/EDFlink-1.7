@@ -18,8 +18,11 @@
 
 package org.apache.flink.runtime.jobmaster;
 
+import it.uniroma2.dspsim.ConfigurationKeys;
+import it.uniroma2.dspsim.dsp.Application;
 import it.uniroma2.edf.am.ApplicationManager;
 import it.uniroma2.edf.am.ApplicationManagerFactory;
+import it.uniroma2.edf.am.EDFlink;
 import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.api.common.time.Time;
 import org.apache.flink.configuration.Configuration;
@@ -159,6 +162,13 @@ public class JobManagerRunner implements LeaderContender, OnCompletionActions, A
 			final SlotPoolFactory slotPoolFactory = DefaultSlotPoolFactory.fromConfiguration(
 				configuration,
 				rpcService);
+
+			//it.uniroma2.dspsim.Configuration conf = it.uniroma2.dspsim.Configuration.getInstance();
+			//Application application = EDFlink.jobGraph2App(jobGraph);
+			//double latencySLO = conf.getDouble(ConfigurationKeys.SLO_LATENCY_KEY, 0.100);
+			//EDFlink edFlink = new EDFlink(jobGraph, latencySLO);
+			//ApplicationManager am = edFlink.newApplicationManager(conf, latencySLO);
+			//new Thread(am).start();
 
 			// EDF: launch the ApplicationManager
 			ApplicationManager am = ApplicationManagerFactory.newApplicationManager(configuration, jobGraph, dispatcher);

@@ -213,16 +213,6 @@ public class ApplicationManager implements Runnable {
 
 	protected void plan(int round) {
 		if(round == 160){
-			try{
-			avglatFileWriter.write("SCALING");
-			avglatFileWriter.newLine();
-			proctimeFileWriter.write("SCALING");
-			proctimeFileWriter.newLine();
-			latFileWriter.write("SCALING");
-			latFileWriter.newLine();
-			} catch (IOException e){
-			e.printStackTrace();
-			}
 			/*
 			ArrayList<Integer> resTypes = this.jobGraph.getTaskResTypes().get((jobGraph.getVerticesAsArray()[1].getID()));
 			resTypes.clear();
