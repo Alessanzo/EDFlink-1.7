@@ -55,6 +55,7 @@ public class ApplicationMonitor {
 			log.info("id2name: {} -> {}", jv.getID().toString(), jv.getName());
 		}
 		jedis = new Jedis("redis", 6379);
+		//jedis = new Jedis("ec2-3-128-94-177.us-east-2.compute.amazonaws.com", 6379);
 		publishOnRedis = true;
 		/*
 		String redisHostname = configuration.getString(CONF_REDIS_HOST, "");

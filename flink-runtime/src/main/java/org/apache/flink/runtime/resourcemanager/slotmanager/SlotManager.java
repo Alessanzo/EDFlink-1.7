@@ -514,6 +514,7 @@ public class SlotManager implements AutoCloseable {
 	protected TaskManagerSlot findMatchingSlot(ResourceProfile requestResourceProfile) {
 		EDFLogger.log("EDF: Allocazione Slot dal ResourceManager", LogLevel.INFO, SlotManager.class);
 		Iterator<Map.Entry<SlotID, TaskManagerSlot>> iterator = freeSlots.entrySet().iterator();
+		if (freeSlots.size() == 0) EDFLogger.log("EDF: NON CI SONO SLOT DISPONIBILI NEL RM", LogLevel.INFO, SlotManager.class);
 
 		TaskManagerSlot bestCandidate = null;
 		int candidateType = -1;
@@ -529,6 +530,7 @@ public class SlotManager implements AutoCloseable {
 
 			candidateType = taskManagerSlot.getResourceProfile().getResourceType();
 
+			/*
 			if (taskManagerSlot.getResourceProfile().isMatching(requestResourceProfile)) {
 				if (candidateType == requestType) {
 					EDFLogger.log("EDF: Lo Slot allocato nel RM matcha!", LogLevel.INFO, SlotManager.class);
@@ -543,6 +545,8 @@ public class SlotManager implements AutoCloseable {
 				}
 			}
 
+			 */
+
 			/*
 			if (taskManagerSlot.getResourceProfile().isMatching(requestResourceProfile) &&
 				(taskManagerSlot.getResourceProfile().getResourceType() == 1)) {
@@ -550,15 +554,17 @@ public class SlotManager implements AutoCloseable {
 				return taskManagerSlot;
 			}
 			*/
-			/*
+
 			if (taskManagerSlot.getResourceProfile().isMatching(requestResourceProfile) &&
 				(taskManagerSlot.getResourceProfile().getResourceType() == requestResourceProfile.getResourceType())) {
 				iterator.remove();
 				return taskManagerSlot;
 			}
-			*/
-		}
 
+
+
+		}
+		/*
 		if (bestCandidate == null) EDFLogger.log("EDF: NON CI SONO SLOT DISPONIBILI NEL RM", LogLevel.INFO, SlotManager.class);
 		else if (bestCandidate.getResourceProfile().getResourceType() > requestType) {
 			EDFLogger.log("EDF: Lo Slot allocato nel RM non matcha, ma ha un tipo maggiore", LogLevel.INFO, SlotManager.class);
@@ -569,7 +575,9 @@ public class SlotManager implements AutoCloseable {
 			freeSlots.remove(bestCandidate.getSlotId());
 		}
 		return bestCandidate;
-		//return null;
+		*/
+		EDFLogger.log("EDF: Nessun Candidato nello Slot Manager è stato scelto perché nessuno matcha", LogLevel.INFO, SlotManager.class);
+		return null;
 	}
 
 	// ---------------------------------------------------------------------------------------------

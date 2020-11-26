@@ -11,14 +11,12 @@ import org.apache.flink.configuration.EDFOptions;
 import org.apache.flink.runtime.dispatcher.Dispatcher;
 import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.jobgraph.JobStatus;
+import org.apache.flink.runtime.jobgraph.JobVertex;
 import org.apache.flink.shaded.netty4.io.netty.handler.logging.LogLevel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
+import java.io.*;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -37,14 +35,16 @@ public class ApplicationManager implements Runnable {
 	protected Dispatcher dispatcher;
 	protected Configuration config;
 
-	protected ApplicationMonitor appMonitor;
+	protected ApplicationMonitor appMonitor = null;
 	protected GlobalActuator globalActuator;
 
 	protected double ir;
 	protected double oldir;
 	protected Map<String, Integer> request = new HashMap<>();
 
-	private BufferedWriter statsFileWriter = null;
+	private BufferedWriter avglatFileWriter = null;
+	private BufferedWriter proctimeFileWriter = null;
+	private BufferedWriter latFileWriter = null;
 
 
 	private int amInterval;
@@ -54,17 +54,21 @@ public class ApplicationManager implements Runnable {
 
 	public ApplicationManager (JobGraph jobGraph,
                                Configuration config,
-                               Dispatcher dispatcher)
-	{
+                               Dispatcher dispatcher) {
 		this.config = config;
 		this.jobGraph = jobGraph;
 		this.dispatcher = dispatcher;
 
-		String statsFilename = config.getString(EDFOptions.EDF_AM_STATS_FILENAME);
-		LOG.info("Writing stats to: {}", statsFilename);
-		if (!statsFilename.isEmpty()) {
+		//String statsFilename = config.getString(EDFOptions.EDF_AM_STATS_FILENAME);
+		String avglatFilename = "";
+		String proctimeFileName = "proctimeout.txt";
+		String latFileName = "onlylatout.txt";
+		LOG.info("Writing stats to: {}", avglatFilename);
+		if (!avglatFilename.isEmpty()) {
 			try {
-				statsFileWriter = new BufferedWriter(new FileWriter(new File(statsFilename), true));
+				avglatFileWriter = new BufferedWriter(new FileWriter(new File(avglatFilename), true));
+				proctimeFileWriter = new BufferedWriter(new FileWriter(new File(proctimeFileName), true));
+				latFileWriter = new BufferedWriter(new FileWriter(new File(latFileName), true));
 			} catch (IOException e) {
 				e.printStackTrace();
 			}
@@ -74,6 +78,7 @@ public class ApplicationManager implements Runnable {
 		this.roundsBetweenPlanning = config.getInteger(EDFOptions.AM_ROUNDS_BEFORE_PLANNING);
 
 		this.globalActuator = new GlobalActuator();
+
 	}
 
 	protected void initialize()
@@ -90,7 +95,8 @@ public class ApplicationManager implements Runnable {
 
 		while (true) {
 			try {
-				Thread.sleep(amInterval*1000);
+				//Thread.sleep(amInterval*1000);
+				Thread.sleep(3000);
 			} catch (InterruptedException e) {}
 
 			CompletableFuture<JobStatus> jobStatusFuture = dispatcher.requestJobStatus(jobGraph.getJobID(), Time.seconds(3));
@@ -127,9 +133,11 @@ public class ApplicationManager implements Runnable {
 			}
 
 
-			if (statsFileWriter != null) {
+			if (avglatFileWriter != null) {
 				try {
-					statsFileWriter.flush();
+					avglatFileWriter.flush();
+					proctimeFileWriter.flush();
+					latFileWriter.flush();
 				} catch (IOException e) {
 					e.printStackTrace();
 				}
@@ -152,40 +160,101 @@ public class ApplicationManager implements Runnable {
 		//jobGraph.getVertices().forEach(jobVertex -> LOG.info("vertextostring " + jobVertex.toString()));
 		JobGraphUtils.listUpstreamOperators(jobGraph, jobGraph.getVerticesAsArray()[1]).forEach(jobVertex -> LOG.info("upstreamtostirng "+jobVertex.toString()));
 		//double ir = appMonitor.getSubtaskInputRate(JobGraphUtils.listOperators(jobGraph, true,true).iterator().next().getOperatorName(),String.valueOf(0));
-		double ir = appMonitor.getSubtaskInputRate(jobGraph.getVerticesAsArray()[1].getName(),String.valueOf(0));
-		EDFLogger.log("EDF: Input Rate: " + ir, LogLevel.INFO, ApplicationManager.class);
-		double operatorIr = appMonitor.getOperatorInputRate(jobGraph.getVerticesAsArray()[1].getName());
-		double appIr = appMonitor.getApplicationInputRate();
-		double operatorLatency = appMonitor.getAvgLatencyUpToOperator(jobGraph.getVerticesAsArray()[1]);
-		double avgOperatorLatency = appMonitor.getAvgOperatorLatency(jobGraph.getVerticesAsArray()[1]);
-		double processingTime = appMonitor.getAvgOperatorProcessingTime(jobGraph.getVerticesAsArray()[1].getName());
-		EDFLogger.log("EDF: operator Input Rate: " + operatorIr, LogLevel.INFO, ApplicationManager.class);
-		EDFLogger.log("EDF: application Input Rate: " + appIr, LogLevel.INFO, ApplicationManager.class);
-		EDFLogger.log("EDF: operatorLatency: " + operatorLatency, LogLevel.INFO, ApplicationManager.class);
-		EDFLogger.log("EDF: avgOperatorLatency: " + avgOperatorLatency, LogLevel.INFO, ApplicationManager.class);
-		EDFLogger.log("EDF: processingTime: " + processingTime, LogLevel.INFO, ApplicationManager.class);
+		if (appMonitor != null) {
+			JobVertex vertex = jobGraph.getVerticesSortedTopologicallyFromSources().get(1);
+			/*
+			double ir = appMonitor.getSubtaskInputRate(jobGraph.getVerticesAsArray()[1].getName(), String.valueOf(0));
+			EDFLogger.log("EDF: Input Rate: " + ir, LogLevel.INFO, ApplicationManager.class);
+			double operatorIr = appMonitor.getOperatorInputRate(jobGraph.getVerticesAsArray()[1].getName());
+			double appIr = appMonitor.getApplicationInputRate();
+			double operatorLatency = appMonitor.getAvgLatencyUpToOperator(jobGraph.getVerticesAsArray()[1]);
+			double avgOperatorLatency = appMonitor.getAvgOperatorLatency(jobGraph.getVerticesAsArray()[1]);
+			double processingTime = appMonitor.getAvgOperatorProcessingTime(jobGraph.getVerticesAsArray()[1].getName());
+
+			 */
+			double ir = appMonitor.getSubtaskInputRate(vertex.getName(), String.valueOf(0));
+			EDFLogger.log("EDF: Input Rate: " + ir, LogLevel.INFO, ApplicationManager.class);
+			double operatorIr = appMonitor.getOperatorInputRate(vertex.getName());
+			double appIr = appMonitor.getApplicationInputRate();
+			double operatorLatency = appMonitor.getAvgLatencyUpToOperator(vertex);
+			double avgOperatorLatency = appMonitor.getAvgOperatorLatency(vertex);
+			double processingTime = appMonitor.getAvgOperatorProcessingTime(vertex.getName());
+			EDFLogger.log("EDF: operator Input Rate: " + operatorIr, LogLevel.INFO, ApplicationManager.class);
+			EDFLogger.log("EDF: application Input Rate: " + appIr, LogLevel.INFO, ApplicationManager.class);
+			EDFLogger.log("EDF: operatorLatency: " + operatorLatency, LogLevel.INFO, ApplicationManager.class);
+			EDFLogger.log("EDF: avgOperatorLatency: " + avgOperatorLatency, LogLevel.INFO, ApplicationManager.class);
+			EDFLogger.log("EDF: processingTime: " + processingTime, LogLevel.INFO, ApplicationManager.class);
+			EDFLogger.log("EDF: avgLatency + processingTime: " + (processingTime+avgOperatorLatency), LogLevel.INFO, ApplicationManager.class);
+
+			//Latencies print for experimentation
+			if (avglatFileWriter != null) {
+				try {
+					avglatFileWriter.write(String.valueOf(processingTime + avgOperatorLatency));
+					avglatFileWriter.newLine();
+					proctimeFileWriter.write(String.valueOf(processingTime));
+					proctimeFileWriter.newLine();
+					latFileWriter.write(String.valueOf(avgOperatorLatency));
+					latFileWriter.newLine();
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+			}
+
+
+		}
 		this.oldir = this.ir;
 		this.ir = ir;
 	}
 
 	protected void analyze() {
 		LOG.info("ANALYZE - parallelism: " +jobGraph.getVerticesAsArray()[1].getParallelism());
-		LOG.info("ANALYZE - parallelism: " +jobGraph.getVerticesAsArray()[2].getParallelism());
+		//LOG.info("ANALYZE - parallelism: " +jobGraph.getVerticesAsArray()[2].getParallelism());
 	}
 
 	protected void plan(int round) {
-		if(round == 4){
+		if(round == 160){
+			try{
+			avglatFileWriter.write("SCALING");
+			avglatFileWriter.newLine();
+			proctimeFileWriter.write("SCALING");
+			proctimeFileWriter.newLine();
+			latFileWriter.write("SCALING");
+			latFileWriter.newLine();
+			} catch (IOException e){
+			e.printStackTrace();
+			}
+			/*
 			ArrayList<Integer> resTypes = this.jobGraph.getTaskResTypes().get((jobGraph.getVerticesAsArray()[1].getID()));
+			resTypes.clear();
 			resTypes.add(0);
 			this.jobGraph.getTaskResTypes().put(jobGraph.getVerticesAsArray()[1].getID(),resTypes);
-			this.request.put(jobGraph.getVerticesAsArray()[1].getID().toString(), 3);
+			this.request.put(jobGraph.getVerticesAsArray()[1].getID().toString(), 1);
+			*/
+
+
+			 for (ArrayList<Integer> list: this.jobGraph.getTaskResTypes().values()){
+			 	list.clear();
+			 	list.add(0);
+			 }
+			this.request.put(jobGraph.getVerticesAsArray()[1].getID().toString(), 1);
+
+			/*
+			ArrayList<Integer> resTypes = this.jobGraph.getTaskResTypes().get((jobGraph.getVerticesSortedTopologicallyFromSources().get(1).getID()));
+			resTypes.clear();
+			resTypes.add(0);
+			this.request.put(jobGraph.getVerticesSortedTopologicallyFromSources().get(1).getID().toString(), 1);
+
+			 */
 		}
+		/*
 		else if(round == 8){
 			ArrayList<Integer> resTypes = this.jobGraph.getTaskResTypes().get((jobGraph.getVerticesAsArray()[2].getID()));
 			resTypes.add(1);
 			this.jobGraph.getTaskResTypes().put(jobGraph.getVerticesAsArray()[2].getID(),resTypes);
 			this.request.put(jobGraph.getVerticesAsArray()[2].getID().toString(), 3);
 		}
+
+		*/
 		//else if(round == 12){
 		//	this.request.put(jobGraph.getVerticesAsArray()[1].getID().toString(), 2);
 		//}

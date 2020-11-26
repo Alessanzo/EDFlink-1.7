@@ -101,14 +101,14 @@ public class EDFSchedulingStrategy implements SchedulingStrategy {
 				//EDFLogger.log("ResourceType da ResourceProfile dello Slot Richiesto: "+ slotProfile.getResourceProfile().getResourceType(), LogLevel.INFO, EDFSchedulingStrategy.class);
 				// this gets candidate is local-weigh
 
-				/*
+
 				if(slotContext.getResourceType() == slotProfile.getResourceProfile().getResourceType()) {
 					EDFLogger.log("ResourceType matcha con richiesta!", LogLevel.INFO, EDFSchedulingStrategy.class);
 					return resultProducer.apply(candidate, Locality.LOCAL);
 				}
-				*/
 
 
+/*
 				if(slotContext.getResourceType() >= slotProfile.getResourceProfile().getResourceType()){
 					if(slotContext.getResourceType() == slotProfile.getResourceProfile().getResourceType()) {
 						currentCandidateScore = 100000;
@@ -123,7 +123,7 @@ public class EDFSchedulingStrategy implements SchedulingStrategy {
 					bestCandidate = candidate;
 					bestCandidateScore = currentCandidateScore;
 				}
-
+*/
 
 
 
@@ -137,7 +137,7 @@ public class EDFSchedulingStrategy implements SchedulingStrategy {
 			}
 			//return resultProducer.apply(bestCandidate, Locality.LOCAL);
 		}
-
+		/*
 		// at the end of the iteration, we return the candidate with best possible locality or null.
 		if (bestCandidate != null) {
 			if (currentCandidateScore >= 100000) EDFLogger.log("EDF: Lo Slot scelto dallo Scheduler matcha!", LogLevel.INFO, EDFSchedulingStrategy.class);
@@ -147,9 +147,10 @@ public class EDFSchedulingStrategy implements SchedulingStrategy {
 		} else {
 			return null;
 		}
+		*/
 
-
-		//return  null;
+		EDFLogger.log("EDF: Non ci sono slot che matchano!", LogLevel.INFO, EDFSchedulingStrategy.class);
+		return  null;
 	}
 
 	public static EDFSchedulingStrategy getInstance() {
