@@ -561,8 +561,6 @@ public class SlotManager implements AutoCloseable {
 				return taskManagerSlot;
 			}
 
-
-
 		}
 		/*
 		if (bestCandidate == null) EDFLogger.log("EDF: NON CI SONO SLOT DISPONIBILI NEL RM", LogLevel.INFO, SlotManager.class);

@@ -8,29 +8,43 @@ import it.uniroma2.dspsim.dsp.edf.EDF;
 import it.uniroma2.dspsim.dsp.edf.am.ApplicationManager;
 import it.uniroma2.dspsim.dsp.edf.am.ApplicationManagerFactory;
 import it.uniroma2.dspsim.dsp.edf.am.ApplicationManagerType;
+import it.uniroma2.dspsim.dsp.edf.om.OperatorManager;
 import it.uniroma2.dspsim.dsp.queueing.MG1OperatorQueueModel;
 import it.uniroma2.dspsim.infrastructure.ComputingInfrastructure;
+import it.uniroma2.edf.EDFLogger;
 import it.uniroma2.edf.JobGraphUtils;
 import org.apache.flink.runtime.dispatcher.Dispatcher;
 import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.jobgraph.JobVertex;
+import org.apache.flink.shaded.netty4.io.netty.handler.logging.LogLevel;
 
 import java.io.*;
-import java.util.HashMap;
-import java.util.Set;
+import java.util.*;
 
 public class EDFlink extends EDF {
 
 	private Application application;
+	private Map<Operator, OperatorManager> operatorManagers;
 
 	public EDFlink(Application application, double sloLatency) {
-		//TODO parametro da passare al costruttore JobGraph, da convertire in Application e passarla a super
 		super(application, sloLatency);
 		this.application = application;
-		//LoggingUtils.configureLogging();(?)
+
+		final List<Operator> operators = application.getOperators();
+		Configuration conf = Configuration.getInstance();
+
+		final int numOperators = operators.size();
+
+		operatorManagers = new HashMap<>(numOperators);
+		for (Operator op : operators) {
+			operatorManagers.put(op, newOperatorManager(op, conf));
+		}
+
+		//LoggingUtils.configureLogging();
 		//simulation.dumpConfigs();
 		//simulation.dumpStats();
 	}
+
 	//TODO TOGLIERE
 	public static void initialize(JobGraph jobGraph){
 		//TODO spostare all'avvio di flink per leggere la configurazione una volta
@@ -47,6 +61,7 @@ public class EDFlink extends EDF {
 
 	}
 
+	//PER ORA E' SENZA SORGENTI
 	public static Application jobGraph2App(JobGraph jobGraph){
 		Application app = new Application();
 		double muScalingFactor = 1.0;
@@ -56,8 +71,8 @@ public class EDFlink extends EDF {
 		final double serviceTimeMean = 1/mu;
 		final double serviceTimeVariance = 1.0/mu*1.0/mu/2.0;
 		final int maxParallelism = jobGraph.getMaximumParallelism();
-		//TODO SENZA SORGENTI?
-		for (JobVertex operator: jobGraph.getVerticesSortedTopologicallyFromSources()){
+
+		for (JobVertex operator: JobGraphUtils.listSortedTopologicallyOperators(jobGraph, true, true)){
 			Operator appOp = new Operator(operator.getName(),
 				new MG1OperatorQueueModel(serviceTimeMean, serviceTimeVariance), maxParallelism);
 			app.addOperator(appOp);
@@ -66,21 +81,29 @@ public class EDFlink extends EDF {
 			Set<JobVertex> upstreamOperators = JobGraphUtils.listUpstreamOperators(jobGraph, operator);
 			if (!upstreamOperators.isEmpty()){
 				for (JobVertex upstrop: upstreamOperators) {
-					Operator upstrAppOp = names2operators.get(upstrop.getName());
-					app.addEdge(upstrAppOp, appOp);
+					if (!upstrop.isInputVertex()) {
+						Operator upstrAppOp = names2operators.get(upstrop.getName());
+						app.addEdge(upstrAppOp, appOp);
+					}
 				}
 			}
 		}
-
+		Collection<ArrayList<Operator>> paths = app.getAllPaths();
+		for (ArrayList<Operator> path: paths){
+			EDFLogger.log("Path Start: ", LogLevel.INFO, EDFlink.class);
+			for (Operator pathoperator: path){
+				EDFLogger.log("Operator in the path: "+pathoperator.getName(), LogLevel.INFO, EDFlink.class);
+			}
+		}
 		return app;
 	}
 
 
 
 
-	private ApplicationManager newApplicationManager(org.apache.flink.configuration.Configuration configuration
+	public ApplicationManager newApplicationManager(org.apache.flink.configuration.Configuration configuration
 		, JobGraph jobGraph, Dispatcher dispatcher, double sloLatency) {
-		return new EDFlinkApplicationManager(configuration, jobGraph, dispatcher, application, sloLatency);
+		return new EDFlinkApplicationManager(configuration, jobGraph, dispatcher, application, operatorManagers, sloLatency);
 	}
 
 }

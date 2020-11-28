@@ -18,6 +18,7 @@
 
 package org.apache.flink.runtime.taskexecutor;
 
+import it.uniroma2.edf.EDFLogger;
 import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.IllegalConfigurationException;
@@ -49,6 +50,7 @@ import org.apache.flink.runtime.taskexecutor.slot.TaskSlotTable;
 import org.apache.flink.runtime.taskexecutor.slot.TimerService;
 import org.apache.flink.runtime.taskmanager.NetworkEnvironmentConfiguration;
 import org.apache.flink.runtime.taskmanager.TaskManagerLocation;
+import org.apache.flink.shaded.netty4.io.netty.handler.logging.LogLevel;
 import org.apache.flink.util.ExceptionUtils;
 import org.apache.flink.util.FlinkException;
 import org.apache.flink.util.Preconditions;
@@ -230,30 +232,19 @@ public class TaskManagerServices {
 		final NetworkEnvironment network = createNetworkEnvironment(taskManagerServicesConfiguration, maxJvmHeapMemory);
 		network.start();
 
-		final TaskManagerLocation taskManagerLocation = new TaskManagerLocation(
-			resourceID,
-			taskManagerServicesConfiguration.getTaskManagerAddress(),
-			network.getConnectionManager().getDataPort());
-
-		// this call has to happen strictly after the network stack has been initialized
-		final MemoryManager memoryManager = createMemoryManager(taskManagerServicesConfiguration, freeHeapMemoryWithDefrag, maxJvmHeapMemory);
-
-		// start the I/O manager, it will create some temp directories.
-		final IOManager ioManager = new IOManagerAsync(taskManagerServicesConfiguration.getTmpDirPaths());
-
-		final BroadcastVariableManager broadcastVariableManager = new BroadcastVariableManager();
+		//EDF
 
 		final List<ResourceProfile> resourceProfiles = new ArrayList<>(taskManagerServicesConfiguration.getNumberOfSlots());
-/*
+
+		/*
 		for (int i = 0; i < taskManagerServicesConfiguration.getNumberOfSlots(); i++) {
 			resourceProfiles.add(ResourceProfile.ANY);
 		}
 		*/
 		//taskManagerServicesConfiguration.getTmId();
-
+		int restype = -1;
 		for (int i = 0; i < taskManagerServicesConfiguration.getNumberOfSlots(); i++) {
 			//int j = i%2;
-			int restype;
 			//se c'è un solo elemento, o c'è un solo taskSlot, o tutti devono avere la stessa Risorsa
 			if (taskManagerServicesConfiguration.getSlotTypes().length == 1){
 				restype = Integer.parseInt(taskManagerServicesConfiguration.getSlotTypes()[0]);
@@ -269,6 +260,23 @@ public class TaskManagerServices {
 			resourceProfiles.get(i).setResourceType(i);
 		}
 */
+		EDFLogger.log("EDF: La TaskManagerLocation di questo TaskManager è: "+ restype,
+			LogLevel.INFO, TaskManagerServices.class);
+
+		final TaskManagerLocation taskManagerLocation = new TaskManagerLocation(
+			resourceID,
+			taskManagerServicesConfiguration.getTaskManagerAddress(),
+			network.getConnectionManager().getDataPort(),
+			restype);
+
+		// this call has to happen strictly after the network stack has been initialized
+		final MemoryManager memoryManager = createMemoryManager(taskManagerServicesConfiguration, freeHeapMemoryWithDefrag, maxJvmHeapMemory);
+
+		// start the I/O manager, it will create some temp directories.
+		final IOManager ioManager = new IOManagerAsync(taskManagerServicesConfiguration.getTmpDirPaths());
+
+		final BroadcastVariableManager broadcastVariableManager = new BroadcastVariableManager();
+
 		final TimerService<AllocationID> timerService = new TimerService<>(
 			new ScheduledThreadPoolExecutor(1),
 			taskManagerServicesConfiguration.getTimerServiceShutdownTimeout());

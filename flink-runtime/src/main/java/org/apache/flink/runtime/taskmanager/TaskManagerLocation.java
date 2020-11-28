@@ -45,6 +45,9 @@ public class TaskManagerLocation implements Comparable<TaskManagerLocation>, jav
 
 	// ------------------------------------------------------------------------
 
+	//EDF
+	private int resType = -1;
+
 	/** The ID of the resource in which the TaskManager is started. This can be for example
 	 * the YARN container ID, Mesos container ID, or any other unique identifier. */
 	private final ResourceID resourceID;
@@ -111,9 +114,20 @@ public class TaskManagerLocation implements Comparable<TaskManagerLocation>, jav
 				"%s @ %s (dataPort=%d)", resourceID, fqdnHostName, dataPort);
 	}
 
+	//EDF
+	public TaskManagerLocation(ResourceID resourceID, InetAddress inetAddress, int dataPort, int resType) {
+		this(resourceID,inetAddress,dataPort);
+		this.resType = resType;
+	}
+
 	// ------------------------------------------------------------------------
 	//  Getters
 	// ------------------------------------------------------------------------
+
+	//EDF
+	public int getResType() {
+		return resType;
+	}
 
 	/**
 	 * Gets the ID of the resource in which the TaskManager is started. The format of this depends

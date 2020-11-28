@@ -47,6 +47,9 @@ public class JobVertex implements java.io.Serializable {
 	// Members that define the structure / topology of the graph
 	// --------------------------------------------------------------------------------------------
 
+	//EDF
+	private ArrayList<Integer> deployedSlotsResTypes = new ArrayList<>();
+
 	/** The ID of the vertex. */
 	private final JobVertexID id;
 
@@ -135,6 +138,9 @@ public class JobVertex implements java.io.Serializable {
 		// the id lists must have the same size
 		this.operatorIDs.add(OperatorID.fromJobVertexID(this.id));
 		this.operatorIdsAlternatives.add(null);
+		//EDF
+		for (int i=0; i< getParallelism(); i++)
+			deployedSlotsResTypes.add(-1);
 	}
 
 	/**
@@ -153,9 +159,21 @@ public class JobVertex implements java.io.Serializable {
 		this.idAlternatives.addAll(alternativeIds);
 		this.operatorIDs.addAll(operatorIds);
 		this.operatorIdsAlternatives.addAll(alternativeOperatorIds);
+		//EDF
+		for (int i=0; i< getParallelism(); i++)
+			deployedSlotsResTypes.add(-1);
 	}
 
 	// --------------------------------------------------------------------------------------------
+	//EDF
+	public void setDeployedSlotResType(int position, int resType) {
+		if (position < deployedSlotsResTypes.size())
+			deployedSlotsResTypes.set(position, resType);
+		else if (position == deployedSlotsResTypes.size())
+			deployedSlotsResTypes.add(position, resType);
+	}
+
+	public ArrayList<Integer> getDeployedSlotsResTypes() { return this.deployedSlotsResTypes; }
 
 	/**
 	 * Returns the ID of this job vertex.
@@ -290,6 +308,12 @@ public class JobVertex implements java.io.Serializable {
 			throw new IllegalArgumentException("The parallelism must be at least one.");
 		}
 		this.parallelism = parallelism;
+
+		//EDF
+		if (deployedSlotsResTypes.size() < parallelism) {
+			while (deployedSlotsResTypes.size() < parallelism)
+				deployedSlotsResTypes.add(-1);
+		}
 	}
 
 	/**

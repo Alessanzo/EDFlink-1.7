@@ -163,12 +163,16 @@ public class JobManagerRunner implements LeaderContender, OnCompletionActions, A
 				configuration,
 				rpcService);
 
-			//it.uniroma2.dspsim.Configuration conf = it.uniroma2.dspsim.Configuration.getInstance();
-			//Application application = EDFlink.jobGraph2App(jobGraph);
-			//double latencySLO = conf.getDouble(ConfigurationKeys.SLO_LATENCY_KEY, 0.100);
-			//EDFlink edFlink = new EDFlink(jobGraph, latencySLO);
-			//ApplicationManager am = edFlink.newApplicationManager(conf, latencySLO);
-			//new Thread(am).start();
+
+			it.uniroma2.dspsim.Configuration conf = it.uniroma2.dspsim.Configuration.getInstance();
+			EDFlink.initialize(jobGraph);
+			Application application = EDFlink.jobGraph2App(jobGraph);
+			double latencySLO = conf.getDouble(ConfigurationKeys.SLO_LATENCY_KEY, 0.100);
+			EDFlink edFlink = new EDFlink(application, latencySLO);
+			it.uniroma2.dspsim.dsp.edf.am.ApplicationManager am2 = edFlink.newApplicationManager(configuration, jobGraph, dispatcher, latencySLO);
+			new Thread((Runnable) am2).start();
+
+
 
 			// EDF: launch the ApplicationManager
 			ApplicationManager am = ApplicationManagerFactory.newApplicationManager(configuration, jobGraph, dispatcher);

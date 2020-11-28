@@ -1,6 +1,8 @@
 package it.uniroma2.edf.am.monitor;
 
+import it.uniroma2.dspsim.dsp.Operator;
 import it.uniroma2.edf.EDFLogger;
+import it.uniroma2.edf.EDFUtils;
 import it.uniroma2.edf.JobGraphUtils;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.EDFOptions;
@@ -39,6 +41,7 @@ public class ApplicationMonitor {
 
 
 	/* Statistics */
+
 	private Map<String, Map<Integer, Double>> operator2subtasksThroughput = new HashMap<>();
 
 	public ApplicationMonitor(JobGraph jobGraph, Configuration configuration)
@@ -75,6 +78,20 @@ public class ApplicationMonitor {
 		jedis.close();
 	}
 
+	//TODO ESCLUDERE LE SORGENTI?
+	public double endToEndLatency() {
+		double latency = 0.0;
+		for(List<JobVertex> path: JobGraphUtils.listSourceSinkPaths(jobGraph)){
+			double pathlatency = 0.0;
+			for (JobVertex vertex: path){
+				double operatorlatency = getAvgOperatorLatency(vertex) + getAvgOperatorProcessingTime(vertex.getName());
+				pathlatency += operatorlatency;
+			}
+			latency = Math.max(latency, pathlatency);
+		}
+		return  latency;
+	}
+
 	public double getSubtaskInputRate(String operator, String subtaskId) {
 		String key = String.format("inputRate.%s.%s.%s", jobGraph.getName(), operator, subtaskId);
 		log.info("key: " + key);
@@ -99,6 +116,22 @@ public class ApplicationMonitor {
 			cur = scanResult.getCursor();
 		} while (!cur.equals(SCAN_POINTER_START));
 		return inputRatesSum;
+	}
+
+	public Map<Operator, Double> getOperatorsInputRate(List<Operator> operators){
+		HashMap<Operator, Double> perOperatorInputRates = new HashMap<>();
+		List<JobVertex> vertices = jobGraph.getVerticesSortedTopologicallyFromSources();
+		ArrayList<JobVertex> clonedVerticesList = new ArrayList<>(vertices);
+		for (Operator operator: operators){
+			for (JobVertex vertex: clonedVerticesList){
+				if (operator.getName().equals(vertex.getName())){
+					double operatorInputRate = getOperatorInputRate(vertex.getName());
+					perOperatorInputRates.put(operator, operatorInputRate);
+					clonedVerticesList.remove(vertex);
+				}
+			}
+		}
+		return perOperatorInputRates;
 	}
 
 	public double getApplicationInputRate()

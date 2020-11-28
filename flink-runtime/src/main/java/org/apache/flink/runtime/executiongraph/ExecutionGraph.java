@@ -865,7 +865,6 @@ public class ExecutionGraph implements AccessExecutionGraph {
 	}
 
 	public void scheduleForExecution() throws JobException {
-
 		final long currentGlobalModVersion = globalModVersion;
 
 		if (transitionState(JobStatus.CREATED, JobStatus.RUNNING)) {

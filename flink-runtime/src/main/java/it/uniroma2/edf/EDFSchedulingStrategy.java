@@ -101,12 +101,19 @@ public class EDFSchedulingStrategy implements SchedulingStrategy {
 				//EDFLogger.log("ResourceType da ResourceProfile dello Slot Richiesto: "+ slotProfile.getResourceProfile().getResourceType(), LogLevel.INFO, EDFSchedulingStrategy.class);
 				// this gets candidate is local-weigh
 
-
+				//STRICT RESPROFILE BEHAVIOR
+				/*
 				if(slotContext.getResourceType() == slotProfile.getResourceProfile().getResourceType()) {
 					EDFLogger.log("ResourceType matcha con richiesta!", LogLevel.INFO, EDFSchedulingStrategy.class);
 					return resultProducer.apply(candidate, Locality.LOCAL);
 				}
+				 */
 
+				//NEW TASKMANAGERLOCATION BEHAVIOR (STRICT)
+				if(slotContext.getTaskManagerLocation().getResType() == slotProfile.getResourceProfile().getResourceType()) {
+					EDFLogger.log("ResourceType matcha con richiesta!", LogLevel.INFO, EDFSchedulingStrategy.class);
+					return resultProducer.apply(candidate, Locality.LOCAL);
+				}
 
 /*
 				if(slotContext.getResourceType() >= slotProfile.getResourceProfile().getResourceType()){

@@ -8,19 +8,18 @@ import it.uniroma2.edf.am.monitor.ApplicationMonitor;
 import org.apache.flink.api.common.time.Time;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.EDFOptions;
+import org.apache.flink.runtime.clusterframework.types.AllocationID;
 import org.apache.flink.runtime.dispatcher.Dispatcher;
 import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.jobgraph.JobStatus;
 import org.apache.flink.runtime.jobgraph.JobVertex;
+import org.apache.flink.runtime.jobgraph.JobVertexID;
 import org.apache.flink.shaded.netty4.io.netty.handler.logging.LogLevel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.*;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 
@@ -84,7 +83,7 @@ public class ApplicationManager implements Runnable {
 	protected void initialize()
 	{
 		LOG.info("AM: INITIALIZED!(modified)");
-		appMonitor = new ApplicationMonitor(jobGraph, config);
+		//appMonitor = new ApplicationMonitor(jobGraph, config);
 	}
 
 	@Override
@@ -152,6 +151,14 @@ public class ApplicationManager implements Runnable {
 	}
 
 	protected void monitor() {
+
+		for (JobVertex vertex: jobGraph.getVerticesSortedTopologicallyFromSources()){
+			ArrayList<Integer> resTypes = vertex.getDeployedSlotsResTypes();
+			int i=1;
+			for (int resType: resTypes)
+				LOG.info("EDF: Vertex "+ vertex.getName()+" Subtask "+ i+ " deployedResType " + resType);
+		}
+
 		LOG.info("Numero di vertici: "+jobGraph.getNumberOfVertices());
 		LOG.info("Lista di vertici: "+jobGraph.getVertices());
 		//jobGraph.getVertices().forEach(jobVertex -> LOG.info("operatorids " + jobVertex.getOperatorIDs()));
@@ -186,6 +193,10 @@ public class ApplicationManager implements Runnable {
 			EDFLogger.log("EDF: processingTime: " + processingTime, LogLevel.INFO, ApplicationManager.class);
 			EDFLogger.log("EDF: avgLatency + processingTime: " + (processingTime+avgOperatorLatency), LogLevel.INFO, ApplicationManager.class);
 
+			double endToEndLatency = appMonitor.endToEndLatency();
+			EDFLogger.log("EDF: Simulation-Like EndToEndLatency: " + endToEndLatency,
+				LogLevel.INFO, it.uniroma2.edf.am.ApplicationManager.class);
+
 			//Latencies print for experimentation
 			if (avglatFileWriter != null) {
 				try {
@@ -212,7 +223,7 @@ public class ApplicationManager implements Runnable {
 	}
 
 	protected void plan(int round) {
-		if(round == 160){
+		if(round == 6){
 			/*
 			ArrayList<Integer> resTypes = this.jobGraph.getTaskResTypes().get((jobGraph.getVerticesAsArray()[1].getID()));
 			resTypes.clear();

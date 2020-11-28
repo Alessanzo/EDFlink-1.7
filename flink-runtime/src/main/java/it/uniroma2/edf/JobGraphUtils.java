@@ -31,6 +31,21 @@ public class JobGraphUtils {
 		return operators;
 	}
 
+	static public List<JobVertex> listSortedTopologicallyOperators (final JobGraph jobGraph, boolean ignoreSources, boolean ignoreSinks)
+	{
+		List<JobVertex> operators = new ArrayList<>();
+
+		for (JobVertex v : jobGraph.getVerticesSortedTopologicallyFromSources()) {
+			if (ignoreSources && v.isInputVertex())
+				continue;
+			if (ignoreSinks && v.isOutputVertex())
+				continue;
+			operators.add(v);
+		}
+
+		return operators;
+	}
+
 	static public List<JobVertex> listSources (final JobGraph jobGraph)
 	{
 		List<JobVertex> sources = new ArrayList<>();

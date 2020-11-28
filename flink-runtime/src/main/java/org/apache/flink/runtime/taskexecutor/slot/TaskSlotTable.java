@@ -27,6 +27,7 @@ import org.apache.flink.runtime.clusterframework.types.ResourceID;
 import org.apache.flink.runtime.clusterframework.types.ResourceProfile;
 import org.apache.flink.runtime.clusterframework.types.SlotID;
 import org.apache.flink.runtime.executiongraph.ExecutionAttemptID;
+import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.taskexecutor.SlotReport;
 import org.apache.flink.runtime.taskexecutor.SlotStatus;
 import org.apache.flink.runtime.taskmanager.Task;
@@ -98,6 +99,7 @@ public class TaskSlotTable implements TimeoutListener<AllocationID> {
 
 		int index = 0;
 
+		//EDF
 		// create the task slots for the given resource profiles
 		for (ResourceProfile resourceProfile: resourceProfiles) {
 			taskSlots.set(index, new TaskSlot(index, resourceProfile));
@@ -203,6 +205,7 @@ public class TaskSlotTable implements TimeoutListener<AllocationID> {
 		boolean result = taskSlot.allocate(jobId, allocationId);
 
 		if (result) {
+
 			// update the allocation id to task slot map
 			allocationIDTaskSlotMap.put(allocationId, taskSlot);
 

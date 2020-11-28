@@ -6,6 +6,7 @@ import it.uniroma2.dspsim.Simulation;
 import it.uniroma2.dspsim.dsp.Application;
 import it.uniroma2.dspsim.dsp.Operator;
 import it.uniroma2.dspsim.dsp.Reconfiguration;
+import it.uniroma2.dspsim.dsp.edf.MonitoringInfo;
 import it.uniroma2.dspsim.dsp.edf.am.ApplicationManager;
 import it.uniroma2.dspsim.dsp.edf.om.OMMonitoringInfo;
 import it.uniroma2.dspsim.dsp.edf.om.OperatorManager;
@@ -33,15 +34,21 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+
+//TODO: dopo il rescaling usa le richieste di rescaling effettuate per controllare il deployment reale di quegli
+// operatori ed aggiornare gli Operator di Application costruendo una Recofiguration col NodeType preciso.
+// È la mia implementazione di applyReconfigurations di Simulation, che io non ho.
 
 public class EDFlinkApplicationManager extends ApplicationManager implements Runnable {
 
 	protected JobGraph jobGraph;
 	protected Dispatcher dispatcher;
 	protected Configuration config;
+	protected Map<Operator, OperatorManager> operatorManagers;
 
 	protected ApplicationMonitor appMonitor = null;
 	protected GlobalActuator globalActuator;
@@ -54,7 +61,6 @@ public class EDFlinkApplicationManager extends ApplicationManager implements Run
 	private final double LATENCY_SLO;
 
 	private InputRateFileReader inputRateFileReader;
-	private Application app;
 
 	private Logger logger = LoggerFactory.getLogger(Simulation.class);
 
@@ -64,6 +70,8 @@ public class EDFlinkApplicationManager extends ApplicationManager implements Run
 
 	private boolean detailedScalingLog;
 
+	private double iterationCost;
+
 	/* Statistics */
 	private Metric metricViolations;
 	private Metric metricReconfigurations;
@@ -72,12 +80,12 @@ public class EDFlinkApplicationManager extends ApplicationManager implements Run
 	private Metric[] metricDeployedInstances;
 
 	public EDFlinkApplicationManager(Configuration configuration, JobGraph jobGraph, Dispatcher dispatcher,
-									 Application application, double sloLatency) {
+									 Application application, Map<Operator, OperatorManager> operatorManagers, double sloLatency) {
 		super(application, sloLatency);
 		config = configuration;
 		this.jobGraph = jobGraph;
 		this.dispatcher = dispatcher;
-		this.app = application;
+		this.operatorManagers = operatorManagers;
 
 		this.amInterval = config.getInteger(EDFOptions.AM_INTERVAL_SECS);
 		this.roundsBetweenPlanning = config.getInteger(EDFOptions.AM_ROUNDS_BEFORE_PLANNING);
@@ -106,7 +114,7 @@ public class EDFlinkApplicationManager extends ApplicationManager implements Run
 	protected void initialize()
 	{
 		EDFLogger.log("EDFlinkAM: INITIALIZED!", LogLevel.INFO, EDFlinkApplicationManager.class);
-		this.appMonitor = new ApplicationMonitor(jobGraph, config);
+		//this.appMonitor = new ApplicationMonitor(jobGraph, config);
 	}
 
 	@Override
@@ -145,17 +153,27 @@ public class EDFlinkApplicationManager extends ApplicationManager implements Run
 			//round = (round + 1) % roundsBetweenPlanning;
 			round = (round + 1);
 			EDFLogger.log("AM: Round " + round, LogLevel.INFO, EDFlinkApplicationManager.class);
-			monitor();
+			double endToEndLatency = monitor();
 
 			if ((round % 2) == 0) {
-				analyze();
+				analyze(endToEndLatency);
 				plan(round);
 				execute();
 			}
 		}
 	}
 
-	protected void monitor() {
+	//TODO deve prendere le metriche necessarie e passarle ai metodi dell'AppManager che estende
+	protected double monitor() {
+		double endToEndLatency = 0.0;
+		for (JobVertex vertex: jobGraph.getVerticesSortedTopologicallyFromSources()){
+			ArrayList<Integer> resTypes = vertex.getDeployedSlotsResTypes();
+			int i=1;
+			for (int resType: resTypes)
+				EDFLogger.log("EDF: Vertex "+ vertex.getName()+" Subtask "+ i+ " deployedResType " + resType,
+					LogLevel.INFO, EDFlinkApplicationManager.class);
+		}
+
 		EDFLogger.log("Numero di vertici: "+jobGraph.getNumberOfVertices(), LogLevel.INFO, EDFlinkApplicationManager.class);
 		EDFLogger.log("Lista di vertici: "+jobGraph.getVertices(), LogLevel.INFO, EDFlinkApplicationManager.class);
 
@@ -193,13 +211,32 @@ public class EDFlinkApplicationManager extends ApplicationManager implements Run
 			EDFLogger.log("EDF: avgLatency + processingTime: " + (processingTime+avgOperatorLatency), LogLevel.INFO, it.uniroma2.edf.am.ApplicationManager.class);
 
 			//Latencies print for experimentation
-
+			endToEndLatency = appMonitor.endToEndLatency();
+			EDFLogger.log("EDF: Simulation-Like EndToEndLatency: " + endToEndLatency,
+				LogLevel.INFO, it.uniroma2.edf.am.ApplicationManager.class);
 		}
+		return endToEndLatency;
 	}
 
-	protected void analyze() {
+	protected void analyze(double endToEndLatency) {
 		EDFLogger.log("AM: ANALYZE - parallelism: " +jobGraph.getVerticesAsArray()[1].getParallelism(), LogLevel.INFO, EDFlinkApplicationManager.class);
 		//LOG.info("ANALYZE - parallelism: " +jobGraph.getVerticesAsArray()[2].getParallelism());
+
+		if (endToEndLatency > LATENCY_SLO) {
+			metricViolations.update(1);
+			iterationCost += this.wSLO;
+		}
+		double deploymentCost = application.computeDeploymentCost();
+		metricResCost.update(deploymentCost);
+		double cRes = (deploymentCost / application.computeMaxDeploymentCost());
+		iterationCost += cRes * this.wRes;
+	}
+
+	protected void plan(double inputRate){
+		MonitoringInfo monitoringInfo = new MonitoringInfo();
+		monitoringInfo.setInputRate(inputRate);
+		Map<Operator, Reconfiguration> reconfigurations = pickReconfigurations(monitoringInfo);
+		//applyReconfigurations(reconfigurations);
 	}
 
 	protected void plan(int round) {
@@ -249,6 +286,22 @@ public class EDFlinkApplicationManager extends ApplicationManager implements Run
 			EDFLogger.log("AM: EXECUTE - RESCALING OPERATORS", LogLevel.INFO, EDFlinkApplicationManager.class);
 			globalActuator.rescale(this.dispatcher, this.jobGraph, this.request);
 		}
+
+
+	}
+
+	public Map<Operator, Reconfiguration> pickReconfigurations (MonitoringInfo monitoringInfo) {
+		Map<Operator, OMMonitoringInfo> omMonitoringInfo = new HashMap<>();
+		Map<Operator, Double> opInputRate = appMonitor.getOperatorsInputRate(application.getOperators());
+		for (Operator op : application.getOperators()) {
+			final double rate = opInputRate.get(op);
+			final double u = op.utilization(rate);
+			omMonitoringInfo.put(op, new OMMonitoringInfo());
+			omMonitoringInfo.get(op).setInputRate(rate);
+			omMonitoringInfo.get(op).setCpuUtilization(u);
+		}
+
+		return this.planReconfigurations(omMonitoringInfo, operatorManagers);
 	}
 
 	private void registerMetrics() {
