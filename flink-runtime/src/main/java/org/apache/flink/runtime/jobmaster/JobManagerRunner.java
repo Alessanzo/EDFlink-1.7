@@ -23,6 +23,8 @@ import it.uniroma2.dspsim.dsp.Application;
 import it.uniroma2.edf.am.ApplicationManager;
 import it.uniroma2.edf.am.ApplicationManagerFactory;
 import it.uniroma2.edf.am.EDFlink;
+import it.uniroma2.edf.am.EDFlinkAppBuilder;
+import it.uniroma2.edf.am.monitor.ApplicationMonitor;
 import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.api.common.time.Time;
 import org.apache.flink.configuration.Configuration;
@@ -163,7 +165,13 @@ public class JobManagerRunner implements LeaderContender, OnCompletionActions, A
 				configuration,
 				rpcService);
 
-
+			EDFlink.initialize(jobGraph);
+			Application application = EDFlinkAppBuilder.buildApplication(jobGraph);
+			ApplicationMonitor appMonitor = new ApplicationMonitor(jobGraph, configuration);
+			it.uniroma2.dspsim.Configuration conf = it.uniroma2.dspsim.Configuration.getInstance();
+			double latencySLO = conf.getDouble(ConfigurationKeys.SLO_LATENCY_KEY, 0.100);
+			EDFlink edFlink= new EDFlink(application, appMonitor, configuration, jobGraph, dispatcher, latencySLO);
+			/*
 			it.uniroma2.dspsim.Configuration conf = it.uniroma2.dspsim.Configuration.getInstance();
 			EDFlink.initialize(jobGraph);
 			Application application = EDFlink.jobGraph2App(jobGraph);
@@ -171,12 +179,12 @@ public class JobManagerRunner implements LeaderContender, OnCompletionActions, A
 			EDFlink edFlink = new EDFlink(application, latencySLO);
 			it.uniroma2.dspsim.dsp.edf.am.ApplicationManager am2 = edFlink.newApplicationManager(configuration, jobGraph, dispatcher, latencySLO);
 			new Thread((Runnable) am2).start();
-
+			 */
 
 
 			// EDF: launch the ApplicationManager
-			ApplicationManager am = ApplicationManagerFactory.newApplicationManager(configuration, jobGraph, dispatcher);
-			new Thread(am).start();
+			//ApplicationManager am = ApplicationManagerFactory.newApplicationManager(configuration, jobGraph, dispatcher);
+			//new Thread(am).start();
 
 			// now start the JobManager
 			this.jobMaster = new JobMaster(

@@ -31,6 +31,7 @@ import org.apache.flink.util.Preconditions;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
@@ -49,6 +50,11 @@ public class JobVertex implements java.io.Serializable {
 
 	//EDF
 	private ArrayList<Integer> deployedSlotsResTypes = new ArrayList<>();
+
+	private AtomicInteger deployedVertexesCounter = null;
+	private Integer deployedTasksCounter = 0;
+
+	private int numVertices = 0;
 
 	/** The ID of the vertex. */
 	private final JobVertexID id;
@@ -166,14 +172,38 @@ public class JobVertex implements java.io.Serializable {
 
 	// --------------------------------------------------------------------------------------------
 	//EDF
-	public void setDeployedSlotResType(int position, int resType) {
+	//called by this Vertex Task while they are concurrenty deploying
+	public synchronized void setDeployedSlotResType(int position, int resType) {
 		if (position < deployedSlotsResTypes.size())
 			deployedSlotsResTypes.set(position, resType);
+		//should not happen with the size increment in "setParallelism" before rescaling
 		else if (position == deployedSlotsResTypes.size())
 			deployedSlotsResTypes.add(position, resType);
+		incDeployedCounter();
 	}
 
 	public ArrayList<Integer> getDeployedSlotsResTypes() { return this.deployedSlotsResTypes; }
+
+	public void setDeployedCounter (AtomicInteger counter, int numVertices){
+		this.deployedVertexesCounter = counter;
+		this.numVertices = numVertices;
+	}
+
+	public void incDeployedCounter() {
+		//increment this vertex number of tasks deployed
+		deployedTasksCounter++;
+		if (deployedTasksCounter == getParallelism()) {
+			//increment this job number of vertexes deployed
+			if (deployedVertexesCounter.incrementAndGet() == numVertices) {
+				synchronized (deployedVertexesCounter) {
+					deployedVertexesCounter.notify();
+				}
+			}
+			deployedTasksCounter = 0;
+		}
+	}
+
+
 
 	/**
 	 * Returns the ID of this job vertex.
@@ -309,11 +339,16 @@ public class JobVertex implements java.io.Serializable {
 		}
 		this.parallelism = parallelism;
 
-		//EDF
+		//EDF: when parallelism changes e.g. before rescaling, size of deployed slots list has to be changed according to it
 		if (deployedSlotsResTypes.size() < parallelism) {
 			while (deployedSlotsResTypes.size() < parallelism)
 				deployedSlotsResTypes.add(-1);
 		}
+		else if (deployedSlotsResTypes.size() > parallelism) {
+			while (deployedSlotsResTypes.size() > parallelism)
+				deployedSlotsResTypes.remove((deployedSlotsResTypes.size() -1));
+		}
+
 	}
 
 	/**

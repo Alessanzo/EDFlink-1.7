@@ -60,7 +60,7 @@ public class JobGraph implements Serializable {
 	private final Map<JobVertexID, JobVertex> taskVertices = new LinkedHashMap<JobVertexID, JobVertex>();
 
 	//EDF
-	private final HashMap<JobVertexID, ArrayList<Integer>> taskResTypes = new HashMap<>();
+	private HashMap<JobVertexID, ArrayList<Integer>> taskResTypes = new HashMap<>();
 
 	/** The job configuration attached to this job. */
 	private final Configuration jobConfiguration = new Configuration();
@@ -182,6 +182,9 @@ public class JobGraph implements Serializable {
 	public HashMap<JobVertexID, ArrayList<Integer>> getTaskResTypes() {
 		return taskResTypes;
 	}
+	public void setTaskResTypes(HashMap<JobVertexID, ArrayList<Integer>> resTypes) {
+		this.taskResTypes = resTypes;
+	}
 
 	/**
 	 * Returns the ID of the job.
@@ -294,7 +297,7 @@ public class JobGraph implements Serializable {
 		JobVertex previous = taskVertices.put(id, vertex);
 
 		//EDF
-
+		//this list is filled, an entry for task, with the demanded resType
 		Integer[] arr = new Integer[vertex.getParallelism()];
 		Arrays.fill(arr, 1);
 		ArrayList<Integer> resList = new ArrayList<>();

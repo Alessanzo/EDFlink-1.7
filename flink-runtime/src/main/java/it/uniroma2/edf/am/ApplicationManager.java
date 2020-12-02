@@ -22,6 +22,7 @@ import java.io.*;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.atomic.AtomicInteger;
 
 
 /**
@@ -48,6 +49,8 @@ public class ApplicationManager implements Runnable {
 
 	private int amInterval;
 	private int roundsBetweenPlanning;
+
+	AtomicInteger deployedCounter = new AtomicInteger();
 
 	protected static final Logger LOG = LoggerFactory.getLogger(ApplicationManager.class);
 
@@ -77,6 +80,8 @@ public class ApplicationManager implements Runnable {
 		this.roundsBetweenPlanning = config.getInteger(EDFOptions.AM_ROUNDS_BEFORE_PLANNING);
 
 		this.globalActuator = new GlobalActuator();
+		for (JobVertex vertex: jobGraph.getVerticesSortedTopologicallyFromSources())
+			vertex.setDeployedCounter(deployedCounter, jobGraph.getNumberOfVertices());
 
 	}
 
@@ -237,7 +242,8 @@ public class ApplicationManager implements Runnable {
 			 	list.clear();
 			 	list.add(0);
 			 }
-			this.request.put(jobGraph.getVerticesAsArray()[1].getID().toString(), 1);
+			 this.request.put(jobGraph.getVerticesSortedTopologicallyFromSources().get(1).getID().toString(), 1);
+			 //this.request.put(jobGraph.getVerticesAsArray()[1].getID().toString(), 1);
 
 			/*
 			ArrayList<Integer> resTypes = this.jobGraph.getTaskResTypes().get((jobGraph.getVerticesSortedTopologicallyFromSources().get(1).getID()));
@@ -247,6 +253,15 @@ public class ApplicationManager implements Runnable {
 
 			 */
 		}
+		/*
+		else if (round == 10){
+			ArrayList<Integer> resTypes = this.jobGraph.getTaskResTypes().get((jobGraph.getVerticesSortedTopologicallyFromSources().get(1).getID()));
+			resTypes.clear();
+			resTypes.add(0);
+			this.request.put(jobGraph.getVerticesSortedTopologicallyFromSources().get(1).getID().toString(), 1);
+		}
+
+		 */
 		/*
 		else if(round == 8){
 			ArrayList<Integer> resTypes = this.jobGraph.getTaskResTypes().get((jobGraph.getVerticesAsArray()[2].getID()));
@@ -283,15 +298,31 @@ public class ApplicationManager implements Runnable {
 
 	protected void execute() {
 		if (this.request.size() > 0) {
+			deployedCounter.set(0);
 			LOG.info("RESCALING OPERATOR");
 			globalActuator.rescale(this.dispatcher, this.jobGraph, this.request);
 			LOG.info("RESCALED?");
-			/*
-			try {
-				Thread.sleep(50000);
-			} catch (InterruptedException e) {}
 
-			 */
+			while (deployedCounter.get() != jobGraph.getNumberOfVertices()) {
+				synchronized (deployedCounter) {
+					try {
+						deployedCounter.wait();
+					} catch (InterruptedException e) {
+						Thread.currentThread().interrupt();
+						EDFLogger.log("Thread interrupted " + e.getMessage(), LogLevel.ERROR, EDFlinkApplicationManager.class);
+					}
+				}
+			}
+			deployedCounter.set(0);
+			for (JobVertex vertex: jobGraph.getVerticesSortedTopologicallyFromSources()){
+				ArrayList<Integer> resTypes = vertex.getDeployedSlotsResTypes();
+				int i=1;
+				for (int resType: resTypes) {
+					LOG.info("EDF: Vertex " + vertex.getName() + " Subtask " + i + " deployedResType " + resType);
+					i++;
+				}
+			}
+
 		}
 	}
 

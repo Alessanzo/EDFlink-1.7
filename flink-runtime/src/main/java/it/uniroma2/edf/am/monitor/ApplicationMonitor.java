@@ -11,9 +11,7 @@ import org.apache.flink.runtime.jobgraph.JobVertex;
 import org.apache.flink.shaded.netty4.io.netty.handler.logging.LogLevel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import redis.clients.jedis.Jedis;
-import redis.clients.jedis.ScanParams;
-import redis.clients.jedis.ScanResult;
+import redis.clients.jedis.*;
 
 import java.util.*;
 import java.util.concurrent.atomic.DoubleAccumulator;
@@ -32,6 +30,7 @@ public class ApplicationMonitor {
 	private boolean publishOnRedis;
 	private boolean logEverything = false;
 	private Jedis jedis = null;
+	private JedisPool jedisPool = null;
 
 	// must be provided as metrics.reporter.<reporter name>.redishost: ....
 	static private final String CONF_REDIS_HOST = "redishost";
@@ -58,6 +57,14 @@ public class ApplicationMonitor {
 			log.info("id2name: {} -> {}", jv.getID().toString(), jv.getName());
 		}
 		jedis = new Jedis("redis", 6379);
+
+		JedisPoolConfig poolConfig = new JedisPoolConfig();
+		poolConfig.setMaxTotal(128);
+		jedisPool = new JedisPool(
+			poolConfig,
+			"redis",
+			6379);
+
 		//jedis = new Jedis("ec2-3-128-94-177.us-east-2.compute.amazonaws.com", 6379);
 		publishOnRedis = true;
 		/*
@@ -78,14 +85,16 @@ public class ApplicationMonitor {
 		jedis.close();
 	}
 
-	//TODO ESCLUDERE LE SORGENTI?
+	//TODO ESCLUDERE LE SORGENTI E SINK?
 	public double endToEndLatency() {
 		double latency = 0.0;
 		for(List<JobVertex> path: JobGraphUtils.listSourceSinkPaths(jobGraph)){
 			double pathlatency = 0.0;
 			for (JobVertex vertex: path){
-				double operatorlatency = getAvgOperatorLatency(vertex) + getAvgOperatorProcessingTime(vertex.getName());
-				pathlatency += operatorlatency;
+				//if ((!vertex.isInputVertex()) && (!vertex.isOutputVertex())) {
+					double operatorlatency = getAvgOperatorLatency(vertex) + getAvgOperatorProcessingTime(vertex.getName());
+					pathlatency += operatorlatency;
+				//}
 			}
 			latency = Math.max(latency, pathlatency);
 		}
@@ -101,13 +110,14 @@ public class ApplicationMonitor {
 	}
 
 	public double getOperatorInputRate(String operator) {
+		Jedis jedis = jedisPool.getResource();
 		String key = String.format("inputRate.%s.%s.*", jobGraph.getName(), operator);
 		ScanParams scanParams = new ScanParams().match(key);
 		String cur = SCAN_POINTER_START;
 		double inputRatesSum = 0.0;
 		do {
+			//ScanResult<String> scanResult = jedis.scan(cur, scanParams);
 			ScanResult<String> scanResult = jedis.scan(cur, scanParams);
-
 			// work with result
 			for (String singleKey: scanResult.getResult()){
 				String value = jedis.get(singleKey);
@@ -115,6 +125,7 @@ public class ApplicationMonitor {
 			}
 			cur = scanResult.getCursor();
 		} while (!cur.equals(SCAN_POINTER_START));
+		jedis.close();
 		return inputRatesSum;
 	}
 

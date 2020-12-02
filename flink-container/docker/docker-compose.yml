@@ -33,7 +33,7 @@ services:
     image: ${FLINK_DOCKER_IMAGE_NAME:-flink-job}
     ports:
       - "8081:8081"
-    command: job-cluster --job-classname ${FLINK_JOB} -Djobmanager.rpc.address=job-cluster -Dparallelism.default=${DEFAULT_PARALLELISM:-1} ${SAVEPOINT_OPTIONS} --port 12345 --hostname 192.168.1.14
+    command: job-cluster --job-classname ${FLINK_JOB} -Djobmanager.rpc.address=job-cluster -Dparallelism.default=${DEFAULT_PARALLELISM:-1} ${SAVEPOINT_OPTIONS} --port 12345 --hostname 192.168.1.14 --rate 10
 
 
   taskmanager_1:

@@ -1,5 +1,6 @@
 package it.uniroma2.edf.am;
 
+import it.unimi.dsi.fastutil.Hash;
 import it.uniroma2.dspsim.ConfigurationKeys;
 import it.uniroma2.dspsim.InputRateFileReader;
 import it.uniroma2.dspsim.Simulation;
@@ -12,6 +13,7 @@ import it.uniroma2.dspsim.dsp.edf.om.OMMonitoringInfo;
 import it.uniroma2.dspsim.dsp.edf.om.OperatorManager;
 import it.uniroma2.dspsim.dsp.edf.om.request.OMRequest;
 import it.uniroma2.dspsim.infrastructure.ComputingInfrastructure;
+import it.uniroma2.dspsim.infrastructure.NodeType;
 import it.uniroma2.dspsim.stats.Statistics;
 import it.uniroma2.dspsim.stats.metrics.CountMetric;
 import it.uniroma2.dspsim.stats.metrics.Metric;
@@ -20,6 +22,7 @@ import it.uniroma2.edf.EDFLogger;
 import it.uniroma2.edf.JobGraphUtils;
 import it.uniroma2.edf.am.execute.GlobalActuator;
 import it.uniroma2.edf.am.monitor.ApplicationMonitor;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.flink.api.common.time.Time;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.EDFOptions;
@@ -27,17 +30,16 @@ import org.apache.flink.runtime.dispatcher.Dispatcher;
 import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.jobgraph.JobStatus;
 import org.apache.flink.runtime.jobgraph.JobVertex;
+import org.apache.flink.runtime.jobgraph.JobVertexID;
 import org.apache.flink.shaded.netty4.io.netty.handler.logging.LogLevel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.atomic.AtomicInteger;
 
 //TODO: dopo il rescaling usa le richieste di rescaling effettuate per controllare il deployment reale di quegli
 // operatori ed aggiornare gli Operator di Application costruendo una Recofiguration col NodeType preciso.
@@ -49,10 +51,17 @@ public class EDFlinkApplicationManager extends ApplicationManager implements Run
 	protected Dispatcher dispatcher;
 	protected Configuration config;
 	protected Map<Operator, OperatorManager> operatorManagers;
+	protected Map<Operator, EDFlinkOperatorManager> EDFlinkOperatorManagers;
+	protected HashMap<String, OperatorManager> perOperatorNameManagers;
+
+	protected HashMap<JobVertexID, ArrayList<Integer>> currentDeployedSlotsResTypes;
 
 	protected ApplicationMonitor appMonitor = null;
 	protected GlobalActuator globalActuator;
 	protected Map<String, Integer> request = new HashMap<>();
+	protected Map<String, JobVertexID> perOperatorNameID = new HashMap<>();
+
+	AtomicInteger deployedCounter = new AtomicInteger();
 
 	private int amInterval;
 	private int roundsBetweenPlanning;
@@ -105,6 +114,46 @@ public class EDFlinkApplicationManager extends ApplicationManager implements Run
 		logger.info("SLO latency: {}", LATENCY_SLO);
 
 	}
+	//SECOND CONSTRUCTOR FOR DECENTRALIZATION
+	public EDFlinkApplicationManager(Configuration configuration, JobGraph jobGraph, Dispatcher dispatcher,
+									 Application application, Map<Operator, EDFlinkOperatorManager> operatorManagers,
+									 double sloLatency, ApplicationMonitor appMonitor) {
+		super(application, sloLatency);
+		config = configuration;
+		this.jobGraph = jobGraph;
+		this.dispatcher = dispatcher;
+		this.EDFlinkOperatorManagers = operatorManagers;
+		this.appMonitor = appMonitor;
+
+		this.amInterval = config.getInteger(EDFOptions.AM_INTERVAL_SECS);
+		this.roundsBetweenPlanning = config.getInteger(EDFOptions.AM_ROUNDS_BEFORE_PLANNING);
+
+		this.globalActuator = new GlobalActuator();
+
+		//initializing deployedCounters around JobVertexes (not dependent by Source/Sink exclusion from App Operators)
+		for (JobVertex vertex: jobGraph.getVerticesSortedTopologicallyFromSources()) {
+			vertex.setDeployedCounter(deployedCounter, jobGraph.getNumberOfVertices());
+			perOperatorNameID.put(vertex.getName(), vertex.getID());
+		}
+		//initializing current resTypes with initial desired, that will be actual
+		this.currentDeployedSlotsResTypes = jobGraph.getTaskResTypes();
+
+		startOperatorManagers();
+
+		registerMetrics();
+
+		this.LATENCY_SLO = sloLatency;
+		it.uniroma2.dspsim.Configuration conf = it.uniroma2.dspsim.Configuration.getInstance();
+		this.wSLO = conf.getDouble(ConfigurationKeys.RL_OM_SLO_WEIGHT_KEY, 0.33);
+		this.wReconf = conf.getDouble(ConfigurationKeys.RL_OM_RECONFIG_WEIGHT_KEY, 0.33);
+		this.wRes = conf.getDouble(ConfigurationKeys.RL_OM_RESOURCES_WEIGHT_KEY, 0.33);
+
+		this.detailedScalingLog = conf.getBoolean(ConfigurationKeys.SIMULATION_DETAILED_SCALING_LOG, false);
+
+		logger.info("SLO latency: {}", LATENCY_SLO);
+
+	}
+
 
 	@Override
 	protected Map<Operator, Reconfiguration> plan(Map<OperatorManager, OMRequest> map, Map<Operator, OMMonitoringInfo> map1) {
@@ -153,13 +202,28 @@ public class EDFlinkApplicationManager extends ApplicationManager implements Run
 			//round = (round + 1) % roundsBetweenPlanning;
 			round = (round + 1);
 			EDFLogger.log("AM: Round " + round, LogLevel.INFO, EDFlinkApplicationManager.class);
-			double endToEndLatency = monitor();
+			//double endToEndLatency = monitor();
 
 			if ((round % 2) == 0) {
-				analyze(endToEndLatency);
-				plan(round);
-				execute();
+				for (JobVertex vertex: JobGraphUtils.listSortedTopologicallyOperators(jobGraph, true, true)) {
+					Operator op = perOperatorNameManagers.get(vertex.getName()).getOperator();
+					EDFlinkOperatorManagers.get(op).notifyReconfigured();
+				}
+				EDFLogger.log("AM: NOTIFIED", LogLevel.INFO, EDFlinkApplicationManager.class);
+				//analyze(endToEndLatency);
+				//plan(round);
+				// Map<Operator, Reconfiguration> reconfigurations = plan2();
+				//execute();
+				//execute2(reconfigurations);
 			}
+		}
+	}
+
+	protected void startOperatorManagers(){
+		this.perOperatorNameManagers = new HashMap<>();
+		for (Map.Entry<Operator, EDFlinkOperatorManager> om: EDFlinkOperatorManagers.entrySet()) {
+			new Thread(om.getValue()).start();
+			this.perOperatorNameManagers.put(om.getKey().getName(), om.getValue().getWrappedOM());
 		}
 	}
 
@@ -218,6 +282,7 @@ public class EDFlinkApplicationManager extends ApplicationManager implements Run
 		return endToEndLatency;
 	}
 
+	//(not dependent by Source/Sink exclusion from App Operators)
 	protected void analyze(double endToEndLatency) {
 		EDFLogger.log("AM: ANALYZE - parallelism: " +jobGraph.getVerticesAsArray()[1].getParallelism(), LogLevel.INFO, EDFlinkApplicationManager.class);
 		//LOG.info("ANALYZE - parallelism: " +jobGraph.getVerticesAsArray()[2].getParallelism());
@@ -237,6 +302,12 @@ public class EDFlinkApplicationManager extends ApplicationManager implements Run
 		monitoringInfo.setInputRate(inputRate);
 		Map<Operator, Reconfiguration> reconfigurations = pickReconfigurations(monitoringInfo);
 		//applyReconfigurations(reconfigurations);
+	}
+
+	//ACCEPT ALL REQUESTS
+	protected Map<Operator, Reconfiguration> plan2(){
+		HashMap<OperatorManager, OMRequest> requests =  pickOMRequests(); //prendi le richieste calcolate dagli OM
+		return acceptAll(requests); //unsa una politica "ACCETTALE TUTTE"
 	}
 
 	protected void plan(int round) {
@@ -286,8 +357,78 @@ public class EDFlinkApplicationManager extends ApplicationManager implements Run
 			EDFLogger.log("AM: EXECUTE - RESCALING OPERATORS", LogLevel.INFO, EDFlinkApplicationManager.class);
 			globalActuator.rescale(this.dispatcher, this.jobGraph, this.request);
 		}
+	}
 
+	protected void execute2(Map<Operator, Reconfiguration> reconfigurations){
+		//prepare operator to scale request list, and desired resType list
+		fillDesiredSchedulingReconf(reconfigurations);
+		deployedCounter.set(0);
+		globalActuator.rescale(this.dispatcher, this.jobGraph, request);
+		//wait until Deployed Tasks notify their deployment
+		waitForTasksDeployment();
+		deployedCounter.set(0);
+		reconfigureOperators();
+	}
 
+	//spot the differences between scaling requests and actual deployment
+	protected void reconfigureOperators() {
+		HashMap<JobVertexID, ArrayList<Integer>> overallDesResTypes = jobGraph.getTaskResTypes();
+		//JobGraphUtils.listSortedTopologicallyOperators() if SOURCE AND SINKS INCLUDED
+		for (JobVertex vertex: JobGraphUtils.listSortedTopologicallyOperators(jobGraph, true, true)) {
+			//Resource Types the current Vertex is deployed on
+			ArrayList<Integer> actualResTypes = vertex.getDeployedSlotsResTypes();
+			//Resource Types the current Vertex should be deployed on this iteration
+			ArrayList<Integer> desiredResTypes = overallDesResTypes.get(vertex.getID());
+			if (actualResTypes.containsAll(desiredResTypes)) {
+				EDFLogger.log("EDF: la riconfigurazione del vertex "+vertex.getName()+" desiderata è stata applicata", LogLevel.INFO, EDFlinkApplicationManager.class);
+			}
+			else {
+				EDFLogger.log("EDF: la riconfigurazione del vertex "+vertex.getName()+" desiderata NON stata applicata", LogLevel.INFO, EDFlinkApplicationManager.class);
+			}
+			Reconfiguration reconf;
+			NodeType[] differedResTypes;
+			//there has been a scale-up
+			if (actualResTypes.size() > currentDeployedSlotsResTypes.get(vertex.getID()).size()){
+				ArrayList<Integer> actualResTypesCopy = new ArrayList<>(actualResTypes);
+				actualResTypesCopy = (ArrayList<Integer>) CollectionUtils.subtract(actualResTypesCopy, currentDeployedSlotsResTypes.get(vertex.getID()));
+				differedResTypes = new NodeType[actualResTypesCopy.size()];
+				int i = 0;
+				for (int nodeTypeIndex: actualResTypesCopy){
+					differedResTypes[i] = ComputingInfrastructure.getInfrastructure().getNodeTypes()[nodeTypeIndex];
+				}
+				reconf = Reconfiguration.scaleOut(differedResTypes);
+			}
+			else if (actualResTypes.size() < currentDeployedSlotsResTypes.get(vertex.getID()).size()){
+				ArrayList<Integer> previousResTypesCopy = new ArrayList<>(currentDeployedSlotsResTypes.get(vertex.getID()));
+				previousResTypesCopy = (ArrayList<Integer>) CollectionUtils.subtract(previousResTypesCopy, actualResTypes);
+				differedResTypes = new NodeType[previousResTypesCopy.size()];
+				int i = 0;
+				for (int nodeTypeIndex: previousResTypesCopy){
+					differedResTypes[i] = ComputingInfrastructure.getInfrastructure().getNodeTypes()[nodeTypeIndex];
+				}
+				reconf = Reconfiguration.scaleIn(differedResTypes);
+			}
+			else
+				reconf = Reconfiguration.doNothing();
+			perOperatorNameManagers.get(vertex.getName()).getOperator().reconfigure(reconf);
+			//notify
+			Operator op = perOperatorNameManagers.get(vertex.getName()).getOperator();
+			EDFlinkOperatorManagers.get(op).notifyReconfigured();
+			//updating current deployed res types for this vertex
+			currentDeployedSlotsResTypes.put(vertex.getID(), actualResTypes);
+		}
+		//update desired for actual. No deployment order should change in already existing subtasks
+		jobGraph.setTaskResTypes(currentDeployedSlotsResTypes);
+	}
+
+	//RICAVA LE RICHIESTE DAGLI EDFLINKOM
+	protected HashMap<OperatorManager, OMRequest> pickOMRequests(){
+		HashMap<OperatorManager, OMRequest> omRequests = new HashMap<>();
+		for (Map.Entry<Operator, EDFlinkOperatorManager> entry : EDFlinkOperatorManagers.entrySet()){
+			OMRequest request = entry.getValue().getReconfRequest();
+			omRequests.put(entry.getValue().getWrappedOM(), request);
+		}
+		return omRequests;
 	}
 
 	public Map<Operator, Reconfiguration> pickReconfigurations (MonitoringInfo monitoringInfo) {
@@ -302,6 +443,29 @@ public class EDFlinkApplicationManager extends ApplicationManager implements Run
 		}
 
 		return this.planReconfigurations(omMonitoringInfo, operatorManagers);
+	}
+
+	public void fillDesiredSchedulingReconf(Map<Operator, Reconfiguration> reconfigurations){
+		for (Map.Entry<Operator, Reconfiguration> reconf: reconfigurations.entrySet()){
+			Operator opToReconf = reconf.getKey();
+			Reconfiguration opReconf = reconf.getValue();
+			JobVertexID operatorID = perOperatorNameID.get(opToReconf.getName());
+			int currentParallelism = jobGraph.getTaskResTypes().get(operatorID).size();
+			int newParallelism;
+			int resTypeToModify;
+			if (opReconf.getInstancesToAdd() != null) {
+				resTypeToModify = opReconf.getInstancesToAdd()[0].getIndex();
+				jobGraph.getTaskResTypes().get(operatorID).add(resTypeToModify);
+				newParallelism = currentParallelism++;
+				request.put(operatorID.toString(), newParallelism);
+			}
+			else if (reconf.getValue().getInstancesToRemove() != null) {
+				resTypeToModify = reconf.getValue().getInstancesToRemove()[0].getIndex();
+				jobGraph.getTaskResTypes().get(operatorID).remove(resTypeToModify);
+				newParallelism = currentParallelism--;
+				request.put(operatorID.toString(), newParallelism);
+			}
+		}
 	}
 
 	private void registerMetrics() {
@@ -328,6 +492,28 @@ public class EDFlinkApplicationManager extends ApplicationManager implements Run
 		for (int i = 0; i < ComputingInfrastructure.getInfrastructure().getNodeTypes().length; i++) {
 			this.metricDeployedInstances[i]	 = new RealValuedMetric("InstancesType" + i);
 			statistics.registerMetric(this.metricDeployedInstances[i]);
+		}
+	}
+
+	public void waitForTasksDeployment() {
+		while (deployedCounter.get() != jobGraph.getNumberOfVertices()) {
+			synchronized (deployedCounter) {
+				try {
+					deployedCounter.wait();
+				} catch (InterruptedException e) {
+					Thread.currentThread().interrupt();
+					EDFLogger.log("Thread interrupted " + e.getMessage(), LogLevel.ERROR, EDFlinkApplicationManager.class);
+				}
+			}
+		}
+		for (JobVertex vertex: jobGraph.getVerticesSortedTopologicallyFromSources()){
+			ArrayList<Integer> resTypes = vertex.getDeployedSlotsResTypes();
+			int i=1;
+			for (int resType: resTypes) {
+				EDFLogger.log("EDF: Vertex " + vertex.getName() + " Subtask " + i + " deployedResType " + resType,
+					LogLevel.INFO, EDFlinkApplicationManager.class);
+				i++;
+			}
 		}
 	}
 
