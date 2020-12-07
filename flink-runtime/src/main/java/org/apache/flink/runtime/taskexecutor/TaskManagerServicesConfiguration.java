@@ -18,17 +18,11 @@
 
 package org.apache.flink.runtime.taskexecutor;
 
+import it.uniroma2.dspsim.ConfigurationKeys;
 import it.uniroma2.edf.EDFLogger;
 import it.uniroma2.edf.EDFUtils;
 import org.apache.flink.api.common.time.Time;
-import org.apache.flink.configuration.CheckpointingOptions;
-import org.apache.flink.configuration.ConfigConstants;
-import org.apache.flink.configuration.Configuration;
-import org.apache.flink.configuration.ConfigurationUtils;
-import org.apache.flink.configuration.IllegalConfigurationException;
-import org.apache.flink.configuration.MemorySize;
-import org.apache.flink.configuration.QueryableStateOptions;
-import org.apache.flink.configuration.TaskManagerOptions;
+import org.apache.flink.configuration.*;
 import org.apache.flink.core.memory.MemoryType;
 import org.apache.flink.runtime.akka.AkkaUtils;
 import org.apache.flink.runtime.io.disk.iomanager.IOManager;
@@ -36,6 +30,7 @@ import org.apache.flink.runtime.io.network.netty.NettyConfig;
 import org.apache.flink.runtime.memory.MemoryManager;
 import org.apache.flink.runtime.taskmanager.NetworkEnvironmentConfiguration;
 import org.apache.flink.shaded.netty4.io.netty.handler.logging.LogLevel;
+import org.apache.flink.util.FlinkException;
 import org.apache.flink.util.MathUtils;
 import org.apache.flink.util.NetUtils;
 
@@ -60,11 +55,6 @@ import static org.apache.flink.util.Preconditions.checkNotNull;
  */
 public class TaskManagerServicesConfiguration {
 	private static final Logger LOG = LoggerFactory.getLogger(TaskManagerServicesConfiguration.class);
-
-	private static final HashMap<String,String> taskManagerSlotTypes = new HashMap<String,String>()
-	{{put("taskmanager_1.slotTypes", "1,0,0,0" );
-	  put("taskmanager_2.slotTypes", "0,1,2,3");
-	}};
 
 	private final String[] slotTypes;
 
@@ -238,31 +228,28 @@ public class TaskManagerServicesConfiguration {
 		//String value = taskManagerSlotTypes.get(key);
 		//String[] slotTypes = value.split(",");
 
-		//SE PASSO LA RISORSA DA LINEA DI COMANDO
-		int globalResType = configuration.getResType();
+
+		//USANDO EDFOPTIONS
 		String[] slotTypes;
-		if (globalResType != -1)
+		if (!configuration.getBoolean(EDFOptions.SLOT_GRANULARITY_RES_TYPE)){
+			int globalResType = configuration.getInteger(EDFOptions.TASKMANAGER_RES_TYPE);
+			//check of the Taskmanager resType passed, must be in range specified in properties
+			if (it.uniroma2.dspsim.Configuration.getInstance().
+				getInteger(ConfigurationKeys.NODE_TYPES_NUMBER_KEY, 3) <= globalResType)
+				throw new FlinkException("The ResType number specified for this Taskmanager is not allowed!");
+
 			slotTypes = new String[]{String.valueOf(globalResType)};
-		else{ //SE PASSO LA RISORSA PER OGNI SLOT DALL'ATTRIBUTO
-			String key = String.format("%s.slotTypes",name);
-			String value = taskManagerSlotTypes.get(key);
-			slotTypes = value.split(",");
+		}
+		//Slot Granularity ResType is not supported by EDFlink MAPE Cycle
+		else{
+			EDFLogger.log("EDF: WARNING - EDFLINK MAPE DOESN'T SUPPORT SLOT GRANULARITY," +
+					" ONLY WORKS WITH TASKMANAGER GRANULARITY RESTYPES",
+				LogLevel.WARN, TaskManagerServicesConfiguration.class);
+
+			slotTypes = configuration.getString(EDFOptions.SLOT_RES_TYPE).split(",");
 		}
 
-		//String[] slotTypes = new String[]{"0", "0", "0", "0"};
-		//Arrays.fill(slotTypes, String.valueOf(configuration.getResType()));
-		/*
-		String propertyKey = String.format("%s.slotTypes",EDFUtils.createRandomName());
-		final Properties properties = new Properties();
-		try {
-			final FileInputStream in = new FileInputStream("EDFConfig.xml");
-			properties.loadFromXML(in);
-			in.close();
-		} catch (Exception e){
-			e.printStackTrace();
-		}
-		String[] slotTypes = properties.getProperty(propertyKey).split(",");
-		 */
+
 
 		// we need this because many configs have been written with a "-1" entry
 		int slots = configuration.getInteger(TaskManagerOptions.NUM_TASK_SLOTS, 1);

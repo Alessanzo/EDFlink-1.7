@@ -20,6 +20,7 @@ package org.apache.flink.runtime.jobmaster;
 
 import it.uniroma2.dspsim.ConfigurationKeys;
 import it.uniroma2.dspsim.dsp.Application;
+import it.uniroma2.edf.EDFLogger;
 import it.uniroma2.edf.am.ApplicationManager;
 import it.uniroma2.edf.am.ApplicationManagerFactory;
 import it.uniroma2.edf.am.EDFlink;
@@ -48,6 +49,7 @@ import org.apache.flink.runtime.leaderelection.LeaderElectionService;
 import org.apache.flink.runtime.messages.Acknowledge;
 import org.apache.flink.runtime.rpc.FatalErrorHandler;
 import org.apache.flink.runtime.rpc.RpcService;
+import org.apache.flink.shaded.netty4.io.netty.handler.logging.LogLevel;
 import org.apache.flink.util.AutoCloseableAsync;
 import org.apache.flink.util.ExceptionUtils;
 import org.apache.flink.util.FlinkException;
@@ -165,21 +167,16 @@ public class JobManagerRunner implements LeaderContender, OnCompletionActions, A
 				configuration,
 				rpcService);
 
+
 			EDFlink.initialize(jobGraph);
-			Application application = EDFlinkAppBuilder.buildApplication(jobGraph);
+
+
 			ApplicationMonitor appMonitor = new ApplicationMonitor(jobGraph, configuration);
+			Application application = EDFlinkAppBuilder.buildApplication(jobGraph, appMonitor);
 			it.uniroma2.dspsim.Configuration conf = it.uniroma2.dspsim.Configuration.getInstance();
 			double latencySLO = conf.getDouble(ConfigurationKeys.SLO_LATENCY_KEY, 0.100);
+			EDFLogger.log("EDF: latencySLO: "+latencySLO, LogLevel.INFO, JobManagerRunner.class);
 			EDFlink edFlink= new EDFlink(application, appMonitor, configuration, jobGraph, dispatcher, latencySLO);
-			/*
-			it.uniroma2.dspsim.Configuration conf = it.uniroma2.dspsim.Configuration.getInstance();
-			EDFlink.initialize(jobGraph);
-			Application application = EDFlink.jobGraph2App(jobGraph);
-			double latencySLO = conf.getDouble(ConfigurationKeys.SLO_LATENCY_KEY, 0.100);
-			EDFlink edFlink = new EDFlink(application, latencySLO);
-			it.uniroma2.dspsim.dsp.edf.am.ApplicationManager am2 = edFlink.newApplicationManager(configuration, jobGraph, dispatcher, latencySLO);
-			new Thread((Runnable) am2).start();
-			 */
 
 
 			// EDF: launch the ApplicationManager

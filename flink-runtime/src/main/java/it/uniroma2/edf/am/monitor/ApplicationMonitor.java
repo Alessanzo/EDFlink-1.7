@@ -56,14 +56,16 @@ public class ApplicationMonitor {
 		for (JobVertex jv : jobGraph.getVertices()) {
 			log.info("id2name: {} -> {}", jv.getID().toString(), jv.getName());
 		}
-		jedis = new Jedis("redis", 6379);
+		String redisHostname = configuration.getString(CONF_REDIS_HOST, "");
+		int redisPort = configuration.getInteger(CONF_REDIS_PORT, 6379);
+		jedis = new Jedis(redisHostname, redisPort);
 
 		JedisPoolConfig poolConfig = new JedisPoolConfig();
 		poolConfig.setMaxTotal(128);
 		jedisPool = new JedisPool(
 			poolConfig,
-			"redis",
-			6379);
+			redisHostname,
+			redisPort);
 
 		//jedis = new Jedis("ec2-3-128-94-177.us-east-2.compute.amazonaws.com", 6379);
 		publishOnRedis = true;
@@ -74,15 +76,19 @@ public class ApplicationMonitor {
 			int redisPort = configuration.getInteger(CONF_REDIS_PORT, 6379);
 			jedis = new Jedis(redisHostname, 6379);
 		}
-
+*/
 		logEverything = configuration.getBoolean(CONF_LOG_EVERYTHING, false);
-		*/
+
 		detailedLatencyLogging = configuration.getBoolean(EDFOptions.EDF_AM_DETAILED_LATENCY_LOGGING);
 	}
 
 	public void close()
 	{
 		jedis.close();
+	}
+
+	public Jedis getPoolConnection() {
+		return jedisPool.getResource();
 	}
 
 	//TODO ESCLUDERE LE SORGENTI E SINK?
@@ -183,6 +189,7 @@ public class ApplicationMonitor {
 
 	public double getAvgOperatorProcessingTime (String operator)
 	{
+		Jedis jedis = jedisPool.getResource();
 		String key = String.format("executionTime.%s.%s.*", jobGraph.getName(), operator);
 		ScanParams scanParams = new ScanParams().match(key);
 		String cur = SCAN_POINTER_START;
@@ -203,6 +210,7 @@ public class ApplicationMonitor {
 		} while (!cur.equals(SCAN_POINTER_START));
 
 		if(subTaskCount == 0) return 0.0;
+		jedis.close();
 		return executionTimeSum / subTaskCount;
 	}
 
@@ -251,6 +259,8 @@ public class ApplicationMonitor {
 
 	public double getAvgLatencyUpToOperator (JobVertex operator)
 	{
+		//Jedis jedis = getPoolConnection(); //ADD
+		Jedis jedis = this.jedisPool.getResource();
 		double operatorLatencySum = 0.0;
 		int numSubtask = operator.getParallelism();
 		HashMap<Integer, Double[]> subtaskLatencies = new HashMap<>();
@@ -278,6 +288,7 @@ public class ApplicationMonitor {
 		for (Double[] elem : subtaskLatencies.values()) {
 			if (elem[0]!=0.0) operatorLatencySum += (elem[1] / elem[0]);
 		}
+		jedis.close(); //ADD
 		return (operatorLatencySum/numSubtask);
 	}
 

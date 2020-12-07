@@ -25,11 +25,7 @@ import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.runtime.blob.TransientBlobKey;
 import org.apache.flink.runtime.clusterframework.ApplicationStatus;
 import org.apache.flink.runtime.clusterframework.messages.InfoMessage;
-import org.apache.flink.runtime.clusterframework.types.AllocationID;
-import org.apache.flink.runtime.clusterframework.types.ResourceID;
-import org.apache.flink.runtime.clusterframework.types.ResourceIDRetrievable;
-import org.apache.flink.runtime.clusterframework.types.ResourceProfile;
-import org.apache.flink.runtime.clusterframework.types.SlotID;
+import org.apache.flink.runtime.clusterframework.types.*;
 import org.apache.flink.runtime.concurrent.FutureUtils;
 import org.apache.flink.runtime.entrypoint.ClusterInformation;
 import org.apache.flink.runtime.heartbeat.HeartbeatListener;
@@ -188,6 +184,12 @@ public abstract class ResourceManager<WorkerType extends ResourceIDRetrievable>
 		this.taskExecutors = new HashMap<>(8);
 		infoMessageListeners = new ConcurrentHashMap<>(8);
 		this.taskExecutorGatewayFutures = new HashMap<>(8);
+	}
+
+	//EDF
+	@Override
+	public boolean isResTypeSlotAvailable(SlotProfile slotProfile){
+		return slotManager.strictMatchSlotResType(slotProfile);
 	}
 
 	// ------------------------------------------------------------------------

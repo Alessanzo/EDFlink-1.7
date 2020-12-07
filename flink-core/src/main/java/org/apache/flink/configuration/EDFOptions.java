@@ -5,6 +5,10 @@ import static org.apache.flink.configuration.ConfigOptions.key;
 
 public class EDFOptions {
 
+	public static final ConfigOption<Boolean> SLOT_GRANULARITY_RES_TYPE = key("edf.slot.granularity").defaultValue(false);
+	public static final ConfigOption<Integer> TASKMANAGER_RES_TYPE = key("edf.resType").defaultValue(0);
+	public static final ConfigOption<String> SLOT_RES_TYPE = key("edf.slot.resType").defaultValue("0");
+
 	/**
 	 * Redis.
 	 */

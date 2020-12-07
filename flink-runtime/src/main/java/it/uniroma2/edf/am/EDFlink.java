@@ -15,6 +15,7 @@ import it.uniroma2.dspsim.infrastructure.ComputingInfrastructure;
 import it.uniroma2.dspsim.utils.Tuple2;
 import it.uniroma2.dspsim.utils.matrix.DoubleMatrix;
 import it.uniroma2.edf.EDFLogger;
+import it.uniroma2.edf.EDFlinkConfiguration;
 import it.uniroma2.edf.JobGraphUtils;
 import it.uniroma2.edf.am.monitor.ApplicationMonitor;
 import org.apache.flink.runtime.dispatcher.Dispatcher;
@@ -73,8 +74,10 @@ public class EDFlink extends EDF {
 	//TODO TOGLIERE
 	public static void initialize(JobGraph jobGraph) {
 		//TODO spostare all'avvio di flink per leggere la configurazione una volta
-		Configuration conf = Configuration.getInstance();
+		Configuration conf = EDFlinkConfiguration.getEDFlinkConfInstance();
 		conf.parseDefaultConfigurationFile();
+		//conf.parseDefaultConfigurationFile();
+		//conf.parseConfigurationFile("/home/alessandro/IdeaProjects/EDFlink-1.7/flink-runtime/src/main/resources/config.properties");
 
 		//LoggingUtils.configureLogging();(?)
 		//TODO spostare all'avvio di flink per leggere il numero di nodi una volta per tutte
@@ -82,12 +85,6 @@ public class EDFlink extends EDF {
 			new double[]{1.0, 0.7, 1.3, 0.9, 1.7, 0.8, 1.8, 2.0, 1.65, 1.5},
 			conf.getInteger(ConfigurationKeys.NODE_TYPES_NUMBER_KEY, 3));
 
-	}
-
-
-	public ApplicationManager newApplicationManager(org.apache.flink.configuration.Configuration configuration
-		, JobGraph jobGraph, Dispatcher dispatcher, double sloLatency) {
-		return new EDFlinkApplicationManager(configuration, jobGraph, dispatcher, application, operatorManagers, sloLatency);
 	}
 
 	public ApplicationManager newApplicationManager(org.apache.flink.configuration.Configuration configuration

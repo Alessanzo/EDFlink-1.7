@@ -232,7 +232,7 @@ public class ApplicationManager implements Runnable {
 			/*
 			ArrayList<Integer> resTypes = this.jobGraph.getTaskResTypes().get((jobGraph.getVerticesAsArray()[1].getID()));
 			resTypes.clear();
-			resTypes.add(0);
+			resTypes.add(0);s
 			this.jobGraph.getTaskResTypes().put(jobGraph.getVerticesAsArray()[1].getID(),resTypes);
 			this.request.put(jobGraph.getVerticesAsArray()[1].getID().toString(), 1);
 			*/
@@ -242,7 +242,13 @@ public class ApplicationManager implements Runnable {
 			 	list.clear();
 			 	list.add(0);
 			 }
-			 this.request.put(jobGraph.getVerticesSortedTopologicallyFromSources().get(1).getID().toString(), 1);
+			 /*
+			 for (JobVertex vertex :JobGraphUtils.listSortedTopologicallyOperators(jobGraph, true, true)){
+			 	this.request.put(vertex.getID().toString(), 4);
+			 }
+
+			  */
+			 this.request.put(jobGraph.getVerticesSortedTopologicallyFromSources().get(1).getID().toString(), 4);
 			 //this.request.put(jobGraph.getVerticesAsArray()[1].getID().toString(), 1);
 
 			/*

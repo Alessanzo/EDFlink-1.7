@@ -536,12 +536,13 @@ public class SlotPool extends RpcEndpoint implements SlotPoolGateway, AllocatedS
 	 * 		and its locality wrt the given location preferences
 	 * @throws NoResourceAvailableException if no task slot could be allocated
 	 */
-	private SlotSharingManager.MultiTaskSlotLocality allocateMultiTaskSlot(
+	private SlotSharingManager.MultiTaskSlotLocality allocateMultiTaskSlotOriginal(
 			AbstractID groupId,
 			SlotSharingManager slotSharingManager,
 			SlotProfile slotProfile,
 			boolean allowQueuedScheduling,
 			Time allocationTimeout) throws NoResourceAvailableException {
+
 
 		// check first whether we have a resolved root slot which we can use
 		SlotSharingManager.MultiTaskSlotLocality multiTaskSlotLocality = slotSharingManager.getResolvedRootSlot(
@@ -630,6 +631,135 @@ public class SlotPool extends RpcEndpoint implements SlotPoolGateway, AllocatedS
 		}
 	}
 
+	private SlotSharingManager.MultiTaskSlotLocality allocateMultiTaskSlot(
+		AbstractID groupId,
+		SlotSharingManager slotSharingManager,
+		SlotProfile slotProfile,
+		boolean allowQueuedScheduling,
+		Time allocationTimeout) throws NoResourceAvailableException {
+
+
+		// check first whether we have a resolved root slot which we can use, using STRICT resType matching EDFSchedulingStrategy
+		SlotSharingManager.MultiTaskSlotLocality multiTaskSlotLocality = slotSharingManager.getResolvedRootSlot(
+			groupId,
+			schedulingStrategy,
+			slotProfile);
+
+		final SlotRequestId allocatedSlotRequestId = new SlotRequestId();
+		SlotAndLocality polledSlotAndLocality = null;
+
+		//if we have it, we finish returning it
+		if (multiTaskSlotLocality != null && multiTaskSlotLocality.getLocality() == Locality.LOCAL) {
+			return multiTaskSlotLocality;
+		}
+		//else we check whether we have a not root Slot already in the Sloot Pool we can use and make root, using STRICT like above
+		else if (multiTaskSlotLocality == null) {
+			polledSlotAndLocality = pollAndAllocateSlot(allocatedSlotRequestId, slotProfile);
+		}
+
+		//if the strict maching strategies didn't find any Slot, we relax them
+		if (polledSlotAndLocality == null && resourceManagerGateway != null) {
+			EDFLogger.log("EDF: NO Strict ResType Slot found by EDFSchedulingStrategy", LogLevel.INFO,
+				SlotPool.class);
+			//check on Resource Manager if we have a strict matching Slot on it
+			boolean resTypeSlotAvailable = resourceManagerGateway.isResTypeSlotAvailable(slotProfile);
+			//if we don't have it, we search for a relaxed matching Slot in the SlotPool, first ad resolved root and secondly as normal
+			if (!resTypeSlotAvailable){
+				slotProfile.setRelaxedSchedReq();
+				EDFLogger.log("EDF: Retrying with Relaxed ResType by EDFSchedulingStrategy", LogLevel.INFO,
+					SlotPool.class);
+				multiTaskSlotLocality = slotSharingManager.getResolvedRootSlot(
+					groupId,
+					schedulingStrategy,
+					slotProfile);
+				if (multiTaskSlotLocality != null && multiTaskSlotLocality.getLocality() == Locality.LOCAL)
+					return multiTaskSlotLocality;
+				else if (multiTaskSlotLocality == null){
+					polledSlotAndLocality = pollAndAllocateSlot(allocatedSlotRequestId, slotProfile);
+				}
+			}
+		}
+
+
+		if (resourceManagerGateway == null)
+			EDFLogger.log("EDF: il gateway è nullo!", LogLevel.INFO,
+				SlotPool.class);
+
+		final SlotRequestId multiTaskSlotRequestId = new SlotRequestId();
+
+		//if we found a non Root Slot in the SlotPool, we make it a RootSlot and return it
+		if (polledSlotAndLocality != null && (polledSlotAndLocality.getLocality() == Locality.LOCAL || multiTaskSlotLocality == null)) {
+
+			final AllocatedSlot allocatedSlot = polledSlotAndLocality.getSlot();
+			final SlotSharingManager.MultiTaskSlot multiTaskSlot = slotSharingManager.createRootSlot(
+				multiTaskSlotRequestId,
+				CompletableFuture.completedFuture(polledSlotAndLocality.getSlot()),
+				allocatedSlotRequestId);
+
+			if (allocatedSlot.tryAssignPayload(multiTaskSlot)) {
+				return SlotSharingManager.MultiTaskSlotLocality.of(multiTaskSlot, polledSlotAndLocality.getLocality());
+			} else {
+				multiTaskSlot.release(new FlinkException("Could not assign payload to allocated slot " +
+					allocatedSlot.getAllocationId() + '.'));
+			}
+		}
+
+		if (multiTaskSlotLocality != null) {
+			// prefer slot sharing group slots over unused slots
+			if (polledSlotAndLocality != null) {
+				releaseSingleSlot(
+					allocatedSlotRequestId,
+					new FlinkException("Locality constraint is not better fulfilled by allocated slot."));
+			}
+			return multiTaskSlotLocality;
+		}
+
+		//if we did not find a root neither a normal Slot in the Slot Pool with strict and relaxed strategy, we ask the RM
+		if (allowQueuedScheduling) {
+			// there is no slot immediately available --> check first for uncompleted slots at the slot sharing group
+			SlotSharingManager.MultiTaskSlot multiTaskSlotFuture = slotSharingManager.getUnresolvedRootSlot(groupId);
+
+			if (multiTaskSlotFuture == null) {
+				// it seems as if we have to request a new slot from the resource manager, this is always the last resort!!!
+				final CompletableFuture<AllocatedSlot> futureSlot = requestNewAllocatedSlot(
+					allocatedSlotRequestId,
+					slotProfile.getResourceProfile(),
+					allocationTimeout);
+
+				multiTaskSlotFuture = slotSharingManager.createRootSlot(
+					multiTaskSlotRequestId,
+					futureSlot,
+					allocatedSlotRequestId);
+
+				futureSlot.whenComplete(
+					(AllocatedSlot allocatedSlot, Throwable throwable) -> {
+						final SlotSharingManager.TaskSlot taskSlot = slotSharingManager.getTaskSlot(multiTaskSlotRequestId);
+
+						if (taskSlot != null) {
+							// still valid
+							if (!(taskSlot instanceof SlotSharingManager.MultiTaskSlot) || throwable != null) {
+								taskSlot.release(throwable);
+							} else {
+								if (!allocatedSlot.tryAssignPayload(((SlotSharingManager.MultiTaskSlot) taskSlot))) {
+									taskSlot.release(new FlinkException("Could not assign payload to allocated slot " +
+										allocatedSlot.getAllocationId() + '.'));
+								}
+							}
+						} else {
+							releaseSingleSlot(
+								allocatedSlotRequestId,
+								new FlinkException("Could not find task slot with " + multiTaskSlotRequestId + '.'));
+						}
+					});
+			}
+
+			return SlotSharingManager.MultiTaskSlotLocality.of(multiTaskSlotFuture, Locality.UNKNOWN);
+
+		} else {
+			throw new NoResourceAvailableException("Could not allocate a shared slot for " + groupId + '.');
+		}
+	}
+
 	/**
 	 * Allocates an allocated slot first by polling from the available slots and then requesting a new
 	 * slot from the ResourceManager if no fitting slot could be found.
@@ -646,6 +776,8 @@ public class SlotPool extends RpcEndpoint implements SlotPoolGateway, AllocatedS
 			Time allocationTimeout) {
 
 		final CompletableFuture<SlotAndLocality> allocatedSlotLocalityFuture;
+
+		resourceManagerGateway.isResTypeSlotAvailable(slotProfile);
 
 		// (1) do we have a slot available already?
 		SlotAndLocality slotFromPool = pollAndAllocateSlot(slotRequestId, slotProfile);
@@ -1505,8 +1637,10 @@ public class SlotPool extends RpcEndpoint implements SlotPoolGateway, AllocatedS
 		SlotAndLocality poll(SchedulingStrategy schedulingStrategy, SlotProfile slotProfile) {
 			// fast path if no slots are available
 			if (availableSlots.isEmpty()) {
+				EDFLogger.log("EDF: NON CI SONO SLOT DISPONIBILI AL POLLING!", LogLevel.INFO, SlotPool.class);
 				return null;
 			}
+			EDFLogger.log("EDF: CI SONO SLOT DISPONIBILI AL POLLING!", LogLevel.INFO, SlotPool.class);
 			Collection<SlotAndTimestamp> slotAndTimestamps = availableSlots.values();
 
 			SlotAndLocality matchingSlotAndLocality = schedulingStrategy.findMatchWithLocality(

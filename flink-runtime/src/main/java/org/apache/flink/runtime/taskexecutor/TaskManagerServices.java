@@ -233,33 +233,23 @@ public class TaskManagerServices {
 		network.start();
 
 		//EDF
-
+		//resourceProfiles to associate with every single Taskmanager Slot, for candidate Slot matching purposes during scheduling
 		final List<ResourceProfile> resourceProfiles = new ArrayList<>(taskManagerServicesConfiguration.getNumberOfSlots());
 
-		/*
-		for (int i = 0; i < taskManagerServicesConfiguration.getNumberOfSlots(); i++) {
-			resourceProfiles.add(ResourceProfile.ANY);
-		}
-		*/
-		//taskManagerServicesConfiguration.getTmId();
 		int restype = -1;
 		for (int i = 0; i < taskManagerServicesConfiguration.getNumberOfSlots(); i++) {
-			//int j = i%2;
 			//se c'è un solo elemento, o c'è un solo taskSlot, o tutti devono avere la stessa Risorsa
 			if (taskManagerServicesConfiguration.getSlotTypes().length == 1){
 				restype = Integer.parseInt(taskManagerServicesConfiguration.getSlotTypes()[0]);
 			}
 			else{
+				if (taskManagerServicesConfiguration.getSlotTypes().length < taskManagerServicesConfiguration.getNumberOfSlots())
+					throw new FlinkException("Slot Types Number must not be shorter than Slot Number");
 				restype = Integer.parseInt(taskManagerServicesConfiguration.getSlotTypes()[i]);
 			}
 			resourceProfiles.add(i, ResourceProfile.getAny(restype));
-			//resourceProfiles.add(i, ResourceProfile.getAny(j));
 		}
-/*
-		for (int i = 0; i < resourceProfiles.size(); i++) {
-			resourceProfiles.get(i).setResourceType(i);
-		}
-*/
+
 		EDFLogger.log("EDF: La TaskManagerLocation di questo TaskManager è: "+ restype,
 			LogLevel.INFO, TaskManagerServices.class);
 
@@ -267,7 +257,7 @@ public class TaskManagerServices {
 			resourceID,
 			taskManagerServicesConfiguration.getTaskManagerAddress(),
 			network.getConnectionManager().getDataPort(),
-			restype);
+			restype); //EDF
 
 		// this call has to happen strictly after the network stack has been initialized
 		final MemoryManager memoryManager = createMemoryManager(taskManagerServicesConfiguration, freeHeapMemoryWithDefrag, maxJvmHeapMemory);

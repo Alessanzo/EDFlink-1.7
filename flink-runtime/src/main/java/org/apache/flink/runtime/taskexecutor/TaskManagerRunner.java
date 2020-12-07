@@ -19,6 +19,7 @@
 package org.apache.flink.runtime.taskexecutor;
 
 import it.uniroma2.edf.EDFLogger;
+import it.uniroma2.edf.EDFlinkConfiguration;
 import org.apache.flink.api.common.time.Time;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.ConfigurationUtils;
@@ -362,6 +363,10 @@ public class TaskManagerRunner implements FatalErrorHandler, AutoCloseableAsync 
 
 		LOG.info("Starting TaskManager with ResourceID: {}", resourceID);
 		EDFLogger.log("EDF: Proprietà di sistema: " + System.getProperty("resType"), LogLevel.INFO, TaskManagerRunner.class);
+
+		//EDF: parsing Policies properties
+		it.uniroma2.dspsim.Configuration conf = EDFlinkConfiguration.getEDFlinkConfInstance();
+		conf.parseDefaultConfigurationFile();
 
 
 		InetAddress remoteAddress = InetAddress.getByName(rpcService.getAddress());

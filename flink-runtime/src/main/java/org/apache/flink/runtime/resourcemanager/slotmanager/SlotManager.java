@@ -23,10 +23,7 @@ import it.uniroma2.edf.EDFLogger;
 import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.time.Time;
-import org.apache.flink.runtime.clusterframework.types.AllocationID;
-import org.apache.flink.runtime.clusterframework.types.ResourceProfile;
-import org.apache.flink.runtime.clusterframework.types.SlotID;
-import org.apache.flink.runtime.clusterframework.types.TaskManagerSlot;
+import org.apache.flink.runtime.clusterframework.types.*;
 import org.apache.flink.runtime.concurrent.ScheduledExecutor;
 import org.apache.flink.runtime.instance.InstanceID;
 import org.apache.flink.runtime.messages.Acknowledge;
@@ -530,7 +527,7 @@ public class SlotManager implements AutoCloseable {
 
 			candidateType = taskManagerSlot.getResourceProfile().getResourceType();
 
-			/*
+
 			if (taskManagerSlot.getResourceProfile().isMatching(requestResourceProfile)) {
 				if (candidateType == requestType) {
 					EDFLogger.log("EDF: Lo Slot allocato nel RM matcha!", LogLevel.INFO, SlotManager.class);
@@ -545,7 +542,7 @@ public class SlotManager implements AutoCloseable {
 				}
 			}
 
-			 */
+
 
 			/*
 			if (taskManagerSlot.getResourceProfile().isMatching(requestResourceProfile) &&
@@ -555,14 +552,17 @@ public class SlotManager implements AutoCloseable {
 			}
 			*/
 
+			/*
 			if (taskManagerSlot.getResourceProfile().isMatching(requestResourceProfile) &&
 				(taskManagerSlot.getResourceProfile().getResourceType() == requestResourceProfile.getResourceType())) {
 				iterator.remove();
 				return taskManagerSlot;
 			}
 
+
+			 */
 		}
-		/*
+
 		if (bestCandidate == null) EDFLogger.log("EDF: NON CI SONO SLOT DISPONIBILI NEL RM", LogLevel.INFO, SlotManager.class);
 		else if (bestCandidate.getResourceProfile().getResourceType() > requestType) {
 			EDFLogger.log("EDF: Lo Slot allocato nel RM non matcha, ma ha un tipo maggiore", LogLevel.INFO, SlotManager.class);
@@ -573,9 +573,41 @@ public class SlotManager implements AutoCloseable {
 			freeSlots.remove(bestCandidate.getSlotId());
 		}
 		return bestCandidate;
-		*/
-		EDFLogger.log("EDF: Nessun Candidato nello Slot Manager è stato scelto perché nessuno matcha", LogLevel.INFO, SlotManager.class);
-		return null;
+
+		//EDFLogger.log("EDF: Nessun Candidato nello Slot Manager è stato scelto perché nessuno matcha", LogLevel.INFO, SlotManager.class);
+		//return null;
+	}
+
+	//EDF
+	public boolean strictMatchSlotResType(SlotProfile slotProfile){
+		Iterator<Map.Entry<SlotID, TaskManagerSlot>> iterator = freeSlots.entrySet().iterator();
+		ResourceProfile requestResourceProfile = slotProfile.getResourceProfile();
+		int requestType = slotProfile.getResourceProfile().getResourceType();
+		int candidateType;
+		ResourceProfile candidateResourceProfile;
+		while (iterator.hasNext()) {
+			TaskManagerSlot taskManagerSlot = iterator.next().getValue();
+			candidateResourceProfile = taskManagerSlot.getResourceProfile();
+			candidateType = taskManagerSlot.getResourceProfile().getResourceType();
+
+			/*
+			// sanity check
+			Preconditions.checkState(
+				taskManagerSlot.getState() == TaskManagerSlot.State.FREE,
+				"TaskManagerSlot %s is not in state FREE but %s.",
+				taskManagerSlot.getSlotId(), taskManagerSlot.getState());
+
+			*/
+			//resType check
+			if (candidateResourceProfile.isMatching(requestResourceProfile) && (candidateType == requestType)) {
+				EDFLogger.log("EDF: RM Slots Check - Esiste uno Slot nel RM che matcha strict!", LogLevel.INFO,
+					SlotManager.class);
+				return true;
+			}
+		}
+		EDFLogger.log("EDF: RM Slots Check - NON esiste uno Slot nel RM che matcha strict", LogLevel.INFO,
+			SlotManager.class);
+		return false;
 	}
 
 	// ---------------------------------------------------------------------------------------------

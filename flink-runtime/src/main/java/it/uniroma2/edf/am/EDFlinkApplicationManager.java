@@ -22,6 +22,7 @@ import it.uniroma2.edf.EDFLogger;
 import it.uniroma2.edf.JobGraphUtils;
 import it.uniroma2.edf.am.execute.GlobalActuator;
 import it.uniroma2.edf.am.monitor.ApplicationMonitor;
+import it.uniroma2.edf.metrics.EDFlinkStatistics;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.flink.api.common.time.Time;
 import org.apache.flink.configuration.Configuration;
@@ -81,40 +82,9 @@ public class EDFlinkApplicationManager extends ApplicationManager implements Run
 
 	private double iterationCost;
 
-	/* Statistics */
-	private Metric metricViolations;
-	private Metric metricReconfigurations;
-	private Metric metricResCost;
-	private Metric metricAvgCost;
-	private Metric[] metricDeployedInstances;
+	private EDFlinkStatistics statistics;
 
-	public EDFlinkApplicationManager(Configuration configuration, JobGraph jobGraph, Dispatcher dispatcher,
-									 Application application, Map<Operator, OperatorManager> operatorManagers, double sloLatency) {
-		super(application, sloLatency);
-		config = configuration;
-		this.jobGraph = jobGraph;
-		this.dispatcher = dispatcher;
-		this.operatorManagers = operatorManagers;
 
-		this.amInterval = config.getInteger(EDFOptions.AM_INTERVAL_SECS);
-		this.roundsBetweenPlanning = config.getInteger(EDFOptions.AM_ROUNDS_BEFORE_PLANNING);
-
-		this.globalActuator = new GlobalActuator();
-
-		registerMetrics();
-
-		this.LATENCY_SLO = sloLatency;
-		it.uniroma2.dspsim.Configuration conf = it.uniroma2.dspsim.Configuration.getInstance();
-		this.wSLO = conf.getDouble(ConfigurationKeys.RL_OM_SLO_WEIGHT_KEY, 0.33);
-		this.wReconf = conf.getDouble(ConfigurationKeys.RL_OM_RECONFIG_WEIGHT_KEY, 0.33);
-		this.wRes = conf.getDouble(ConfigurationKeys.RL_OM_RESOURCES_WEIGHT_KEY, 0.33);
-
-		this.detailedScalingLog = conf.getBoolean(ConfigurationKeys.SIMULATION_DETAILED_SCALING_LOG, false);
-
-		logger.info("SLO latency: {}", LATENCY_SLO);
-
-	}
-	//SECOND CONSTRUCTOR FOR DECENTRALIZATION
 	public EDFlinkApplicationManager(Configuration configuration, JobGraph jobGraph, Dispatcher dispatcher,
 									 Application application, Map<Operator, EDFlinkOperatorManager> operatorManagers,
 									 double sloLatency, ApplicationMonitor appMonitor) {
@@ -127,8 +97,11 @@ public class EDFlinkApplicationManager extends ApplicationManager implements Run
 
 		this.amInterval = config.getInteger(EDFOptions.AM_INTERVAL_SECS);
 		this.roundsBetweenPlanning = config.getInteger(EDFOptions.AM_ROUNDS_BEFORE_PLANNING);
+		EDFLogger.log("EDF: ROUNDS-BEFORE-PLANNING: " + roundsBetweenPlanning,
+			LogLevel.INFO, it.uniroma2.edf.am.ApplicationManager.class);
 
 		this.globalActuator = new GlobalActuator();
+		this.statistics = new EDFlinkStatistics();
 
 		//initializing deployedCounters around JobVertexes (not dependent by Source/Sink exclusion from App Operators)
 		for (JobVertex vertex: jobGraph.getVerticesSortedTopologicallyFromSources()) {
@@ -140,7 +113,7 @@ public class EDFlinkApplicationManager extends ApplicationManager implements Run
 
 		startOperatorManagers();
 
-		registerMetrics();
+		//registerMetrics();
 
 		this.LATENCY_SLO = sloLatency;
 		it.uniroma2.dspsim.Configuration conf = it.uniroma2.dspsim.Configuration.getInstance();
@@ -163,7 +136,6 @@ public class EDFlinkApplicationManager extends ApplicationManager implements Run
 	protected void initialize()
 	{
 		EDFLogger.log("EDFlinkAM: INITIALIZED!", LogLevel.INFO, EDFlinkApplicationManager.class);
-		//this.appMonitor = new ApplicationMonitor(jobGraph, config);
 	}
 
 	@Override
@@ -175,7 +147,7 @@ public class EDFlinkApplicationManager extends ApplicationManager implements Run
 		while (true) {
 			try {
 				//Thread.sleep(amInterval*1000);
-				Thread.sleep(3000);
+				Thread.sleep(10000);
 			} catch (InterruptedException e) {
 			}
 
@@ -202,15 +174,23 @@ public class EDFlinkApplicationManager extends ApplicationManager implements Run
 			//round = (round + 1) % roundsBetweenPlanning;
 			round = (round + 1);
 			EDFLogger.log("AM: Round " + round, LogLevel.INFO, EDFlinkApplicationManager.class);
-			//double endToEndLatency = monitor();
+
+			double endToEndLatency = monitor2();//use AppMonitor
 
 			if ((round % 2) == 0) {
+				analyze(endToEndLatency); //calculate costs
+				Map<Operator, Reconfiguration> reconfRequests = plan2(); //take requests
+				reconfRequests.forEach((op,req) -> EDFLogger.log("EDF: PLAN - reconfigurations: "+req.toString(),
+					LogLevel.INFO, EDFlinkApplicationManager.class)); //print requests taken
+				/*
 				for (JobVertex vertex: JobGraphUtils.listSortedTopologicallyOperators(jobGraph, true, true)) {
 					Operator op = perOperatorNameManagers.get(vertex.getName()).getOperator();
-					EDFlinkOperatorManagers.get(op).notifyReconfigured();
+					EDFlinkOperatorManagers.get(op).notifyReconfigured(); //unblock EDFlinkOMs
 				}
-				EDFLogger.log("AM: NOTIFIED", LogLevel.INFO, EDFlinkApplicationManager.class);
-				//analyze(endToEndLatency);
+
+				 */
+				//EDFLogger.log("AM: NOTIFIED", LogLevel.INFO, EDFlinkApplicationManager.class);
+				execute2(reconfRequests);
 				//plan(round);
 				// Map<Operator, Reconfiguration> reconfigurations = plan2();
 				//execute();
@@ -282,19 +262,32 @@ public class EDFlinkApplicationManager extends ApplicationManager implements Run
 		return endToEndLatency;
 	}
 
+	protected double monitor2() {
+		//Latencies print for experimentation
+		double endToEndLatency = appMonitor.endToEndLatency();
+		EDFLogger.log("EDF: Simulation-Like EndToEndLatency: " + endToEndLatency,
+			LogLevel.INFO, it.uniroma2.edf.am.ApplicationManager.class);
+		return endToEndLatency;
+	}
+
 	//(not dependent by Source/Sink exclusion from App Operators)
 	protected void analyze(double endToEndLatency) {
 		EDFLogger.log("AM: ANALYZE - parallelism: " +jobGraph.getVerticesAsArray()[1].getParallelism(), LogLevel.INFO, EDFlinkApplicationManager.class);
 		//LOG.info("ANALYZE - parallelism: " +jobGraph.getVerticesAsArray()[2].getParallelism());
-
+		boolean sloViolated = false;
 		if (endToEndLatency > LATENCY_SLO) {
-			metricViolations.update(1);
+			sloViolated = true;
+			//metricViolations.update(1);
+			statistics.updateViolations(1);
 			iterationCost += this.wSLO;
 		}
 		double deploymentCost = application.computeDeploymentCost();
-		metricResCost.update(deploymentCost);
+		//metricResCost.update(deploymentCost);
+		statistics.updateResCost(deploymentCost);
 		double cRes = (deploymentCost / application.computeMaxDeploymentCost());
 		iterationCost += cRes * this.wRes;
+		EDFLogger.log("EDF: ANALYZE - Latency SLO violation: "+sloViolated+", deployment cost: "+deploymentCost,
+			LogLevel.INFO, EDFlinkApplicationManager.class);
 	}
 
 	protected void plan(double inputRate){
@@ -360,6 +353,14 @@ public class EDFlinkApplicationManager extends ApplicationManager implements Run
 	}
 
 	protected void execute2(Map<Operator, Reconfiguration> reconfigurations){
+		if (reconfigurations.isEmpty()){
+			EDFLogger.log("EDF: EXECUTE - no reconf, skipping execution", LogLevel.INFO, EDFlinkApplicationManager.class);
+			for (JobVertex vertex: JobGraphUtils.listSortedTopologicallyOperators(jobGraph, true, true)) {
+				Operator op = perOperatorNameManagers.get(vertex.getName()).getOperator();
+				EDFlinkOperatorManagers.get(op).notifyReconfigured();
+			}
+			return;
+		}
 		//prepare operator to scale request list, and desired resType list
 		fillDesiredSchedulingReconf(reconfigurations);
 		deployedCounter.set(0);
@@ -419,6 +420,8 @@ public class EDFlinkApplicationManager extends ApplicationManager implements Run
 		}
 		//update desired for actual. No deployment order should change in already existing subtasks
 		jobGraph.setTaskResTypes(currentDeployedSlotsResTypes);
+		EDFLogger.log("EDF: EXECUTE - Lista dei resTypes desiderati per il giro successivo: "+jobGraph.getTaskResTypes().toString(),
+			LogLevel.INFO, EDFlinkApplicationManager.class);
 	}
 
 	//RICAVA LE RICHIESTE DAGLI EDFLINKOM
@@ -456,18 +459,22 @@ public class EDFlinkApplicationManager extends ApplicationManager implements Run
 			if (opReconf.getInstancesToAdd() != null) {
 				resTypeToModify = opReconf.getInstancesToAdd()[0].getIndex();
 				jobGraph.getTaskResTypes().get(operatorID).add(resTypeToModify);
-				newParallelism = currentParallelism++;
+				newParallelism = ++currentParallelism;
 				request.put(operatorID.toString(), newParallelism);
 			}
 			else if (reconf.getValue().getInstancesToRemove() != null) {
 				resTypeToModify = reconf.getValue().getInstancesToRemove()[0].getIndex();
 				jobGraph.getTaskResTypes().get(operatorID).remove(resTypeToModify);
-				newParallelism = currentParallelism--;
+				newParallelism = --currentParallelism;
 				request.put(operatorID.toString(), newParallelism);
 			}
 		}
+		jobGraph.getTaskResTypes().forEach((ver,resTypes)->EDFLogger.log(
+			"EDF: EXECUTE - resType desiderate dai Task di "+ver.toString()+": "+resTypes.toString(),
+			LogLevel.INFO, EDFlinkApplicationManager.class));
 	}
 
+	/*
 	private void registerMetrics() {
 		Statistics statistics = Statistics.getInstance();
 
@@ -495,6 +502,8 @@ public class EDFlinkApplicationManager extends ApplicationManager implements Run
 		}
 	}
 
+	 */
+
 	public void waitForTasksDeployment() {
 		while (deployedCounter.get() != jobGraph.getNumberOfVertices()) {
 			synchronized (deployedCounter) {
@@ -510,7 +519,7 @@ public class EDFlinkApplicationManager extends ApplicationManager implements Run
 			ArrayList<Integer> resTypes = vertex.getDeployedSlotsResTypes();
 			int i=1;
 			for (int resType: resTypes) {
-				EDFLogger.log("EDF: Vertex " + vertex.getName() + " Subtask " + i + " deployedResType " + resType,
+				EDFLogger.log("EDF: EXECUTE - deployment: Vertex " + vertex.getName() + " Subtask " + i + " deployedResType " + resType,
 					LogLevel.INFO, EDFlinkApplicationManager.class);
 				i++;
 			}

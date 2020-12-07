@@ -35,8 +35,12 @@ public class RedisMetricsReporter implements MetricReporter, Scheduled {
 
 	@Override
 	public void open(MetricConfig metricConfig) {
-		jedis = new Jedis("redis", 6379);
+
+		//jedis = new Jedis("localhost", 6379);
 		//jedis = new Jedis("ec2-3-128-94-177.us-east-2.compute.amazonaws.com", 6379);
+		String redisHostname = metricConfig.getString(CONF_REDIS_HOST, "localhost");
+		int redisPort = metricConfig.getInteger(CONF_REDIS_PORT, 6379);
+		jedis = new Jedis(redisHostname, redisPort);
 		publishOnRedis = true;
 		if (jedis != null) EDFLogger.log("EDF: Redis Metric Reporter Connected to Redis!", LogLevel.INFO, RedisMetricsReporter.class);
 		/*

@@ -30,8 +30,8 @@ public class EDFSchedulingStrategy implements SchedulingStrategy {
 	EDFSchedulingStrategy(){}
 
 	@Nullable
-	@Override
-	public <IN, OUT> OUT findMatchWithLocality(
+	//@Override
+	public <IN, OUT> OUT findMatchWithLocality2(
 		@Nonnull SlotProfile slotProfile,
 		@Nonnull Supplier<Stream<IN>> candidates,
 		@Nonnull Function<IN, SlotInfo> contextExtractor,
@@ -44,6 +44,105 @@ public class EDFSchedulingStrategy implements SchedulingStrategy {
 			contextExtractor,
 			additionalRequirementsFilter,
 			resultProducer);
+	}
+
+	@Override
+	public <IN, OUT> OUT findMatchWithLocality(
+		@Nonnull SlotProfile slotProfile,
+		@Nonnull Supplier<Stream<IN>> candidates,
+		@Nonnull Function<IN, SlotInfo> contextExtractor,
+		@Nonnull Predicate<IN> additionalRequirementsFilter,
+		@Nonnull BiFunction<IN, Locality, OUT> resultProducer) {
+
+		if (slotProfile.isStrictSchedReq())
+			return doFindMatchStrict(
+				slotProfile,
+				candidates.get(),
+				contextExtractor,
+				additionalRequirementsFilter,
+				resultProducer);
+
+		else
+			return doFindMatchRelaxed(
+				slotProfile,
+				candidates.get(),
+				contextExtractor,
+				additionalRequirementsFilter,
+				resultProducer);
+	}
+
+	protected  <IN, OUT> OUT doFindMatchStrict(
+		@Nonnull SlotProfile slotProfile,
+		@Nonnull Stream<IN> candidates,
+		@Nonnull Function<IN, SlotInfo> contextExtractor,
+		@Nonnull Predicate<IN> additionalRequirementsFilter,
+		@Nonnull BiFunction<IN, Locality, OUT> resultProducer) {
+
+		EDFLogger.log("EDF: Scheduler STRICT in azione per schedulare un Task tra gli Slot dello SlotPool", LogLevel.INFO, EDFSchedulingStrategy.class);
+
+		Iterator<IN> iterator = candidates.iterator();
+
+		while (iterator.hasNext()) {
+			IN candidate = iterator.next();
+			if (additionalRequirementsFilter.test(candidate)) {
+				SlotInfo slotContext = contextExtractor.apply(candidate);
+				if (slotContext.getTaskManagerLocation().getResType() == slotProfile.getResourceProfile().getResourceType()) {
+					EDFLogger.log("ResourceType matcha con richiesta!", LogLevel.INFO, EDFSchedulingStrategy.class);
+					return resultProducer.apply(candidate, Locality.LOCAL);
+				}
+			}
+		}
+
+		EDFLogger.log("EDF: Non ci sono slot che matchano!", LogLevel.INFO, EDFSchedulingStrategy.class);
+		return  null;
+
+	}
+
+	protected  <IN, OUT> OUT doFindMatchRelaxed(
+		@Nonnull SlotProfile slotProfile,
+		@Nonnull Stream<IN> candidates,
+		@Nonnull Function<IN, SlotInfo> contextExtractor,
+		@Nonnull Predicate<IN> additionalRequirementsFilter,
+		@Nonnull BiFunction<IN, Locality, OUT> resultProducer) {
+
+		EDFLogger.log("EDF: Scheduler RELAXED in azione per schedulare un Task tra gli Slot dello SlotPool", LogLevel.INFO, EDFSchedulingStrategy.class);
+		Iterator<IN> iterator = candidates.iterator();
+
+		IN bestCandidate = null;
+		int bestCandidateScore = Integer.MIN_VALUE;
+		int currentCandidateScore = 0;
+
+		while (iterator.hasNext()) {
+			IN candidate = iterator.next();
+			if (additionalRequirementsFilter.test(candidate)) {
+				SlotInfo slotContext = contextExtractor.apply(candidate);
+
+				if(slotContext.getTaskManagerLocation().getResType() >= slotProfile.getResourceProfile().getResourceType()){
+					if(slotContext.getTaskManagerLocation().getResType() == slotProfile.getResourceProfile().getResourceType()) {
+						currentCandidateScore = 100000;
+					}
+					else currentCandidateScore = 50000;
+				}
+				for (TaskManagerLocation location: slotProfile.getPreferredLocations()) {
+					if (slotContext.getTaskManagerLocation().getResourceID() == location.getResourceID())
+						currentCandidateScore++;
+				}
+				if (currentCandidateScore > bestCandidateScore) {
+					bestCandidate = candidate;
+					bestCandidateScore = currentCandidateScore;
+				}
+			}
+		}
+
+		// at the end of the iteration, we return the candidate with best possible locality or null.
+		if (bestCandidate != null) {
+			if (currentCandidateScore >= 100000) EDFLogger.log("EDF: Lo Slot scelto dallo Scheduler matcha!", LogLevel.INFO, EDFSchedulingStrategy.class);
+			else if (currentCandidateScore >= 50000) EDFLogger.log("EDF: Lo Slot scelto dallo Scheduler non matcha, ma ha un tipo maggiore", LogLevel.INFO, EDFSchedulingStrategy.class);
+			else EDFLogger.log("EDF: Lo Slot scelto dallo Scheduler non matcha", LogLevel.INFO, EDFSchedulingStrategy.class);
+			return resultProducer.apply(bestCandidate, Locality.LOCAL);
+		} else {
+			return null;
+		}
 	}
 
 	@Nullable
@@ -60,11 +159,14 @@ public class EDFSchedulingStrategy implements SchedulingStrategy {
 		// if we have no location preferences, we can only filter by the additional requirements.
 		if (locationPreferences.isEmpty()) {
 			EDFLogger.log("EDF: Le LocationPreferences del Task sono vuote!", LogLevel.INFO, EDFSchedulingStrategy.class);
+			/*
 			return candidates
 				.filter(additionalRequirementsFilter)
 				.findFirst()
 				.map((result) -> resultProducer.apply(result, Locality.UNCONSTRAINED))
 				.orElse(null);
+
+			 */
 		}
 		//EDFLogger.log("EDF: Le LocationPreferences del Task NON sono vuote!", LogLevel.INFO, EDFSchedulingStrategy.class);
 		// we build up two indexes, one for resource id and one for host names of the preferred locations.

@@ -27,6 +27,7 @@ import org.apache.flink.runtime.clusterframework.ApplicationStatus;
 import org.apache.flink.runtime.clusterframework.types.AllocationID;
 import org.apache.flink.runtime.clusterframework.types.ResourceID;
 import org.apache.flink.runtime.clusterframework.types.SlotID;
+import org.apache.flink.runtime.clusterframework.types.SlotProfile;
 import org.apache.flink.runtime.instance.HardwareDescription;
 import org.apache.flink.runtime.instance.InstanceID;
 import org.apache.flink.runtime.jobmaster.JobMaster;
@@ -50,6 +51,9 @@ import java.util.concurrent.CompletableFuture;
  * The {@link ResourceManager}'s RPC gateway interface.
  */
 public interface ResourceManagerGateway extends FencedRpcGateway<ResourceManagerId> {
+
+	//EDF
+	boolean isResTypeSlotAvailable(SlotProfile slotProfile);
 
 	/**
 	 * Register a {@link JobMaster} at the resource manager.

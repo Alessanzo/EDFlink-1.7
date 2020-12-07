@@ -35,6 +35,9 @@ import java.util.Set;
  */
 public class SlotProfile {
 
+	//EDF
+	private boolean strictSchedReq = true;
+
 	/** Singleton object for a slot profile without any requirements. */
 	private static final SlotProfile NO_REQUIREMENTS = noLocality(ResourceProfile.UNKNOWN);
 
@@ -72,6 +75,15 @@ public class SlotProfile {
 		this.preferredLocations = preferredLocations;
 		this.preferredAllocations = preferredAllocations;
 		this.previousExecutionGraphAllocations = previousExecutionGraphAllocations;
+	}
+
+	//EDF
+	public void setRelaxedSchedReq(){
+		this.strictSchedReq = false;
+	}
+
+	public boolean isStrictSchedReq(){
+		return strictSchedReq;
 	}
 
 	/**
