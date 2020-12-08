@@ -42,9 +42,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicInteger;
 
-//TODO: dopo il rescaling usa le richieste di rescaling effettuate per controllare il deployment reale di quegli
-// operatori ed aggiornare gli Operator di Application costruendo una Recofiguration col NodeType preciso.
-// È la mia implementazione di applyReconfigurations di Simulation, che io non ho.
 
 public class EDFlinkApplicationManager extends ApplicationManager implements Runnable {
 
@@ -55,6 +52,7 @@ public class EDFlinkApplicationManager extends ApplicationManager implements Run
 	protected Map<Operator, EDFlinkOperatorManager> EDFlinkOperatorManagers;
 	protected HashMap<String, OperatorManager> perOperatorNameManagers;
 
+	//map of every Vertex associated with the resType list of the Slots in which they are actually scheduled
 	protected HashMap<JobVertexID, ArrayList<Integer>> currentDeployedSlotsResTypes;
 
 	protected ApplicationMonitor appMonitor = null;
@@ -112,8 +110,6 @@ public class EDFlinkApplicationManager extends ApplicationManager implements Run
 		this.currentDeployedSlotsResTypes = jobGraph.getTaskResTypes();
 
 		startOperatorManagers();
-
-		//registerMetrics();
 
 		this.LATENCY_SLO = sloLatency;
 		it.uniroma2.dspsim.Configuration conf = it.uniroma2.dspsim.Configuration.getInstance();
@@ -368,7 +364,7 @@ public class EDFlinkApplicationManager extends ApplicationManager implements Run
 		//wait until Deployed Tasks notify their deployment
 		waitForTasksDeployment();
 		deployedCounter.set(0);
-		reconfigureOperators();
+		reconfigureOperators2();
 	}
 
 	//spot the differences between scaling requests and actual deployment
@@ -376,16 +372,22 @@ public class EDFlinkApplicationManager extends ApplicationManager implements Run
 		HashMap<JobVertexID, ArrayList<Integer>> overallDesResTypes = jobGraph.getTaskResTypes();
 		//JobGraphUtils.listSortedTopologicallyOperators() if SOURCE AND SINKS INCLUDED
 		for (JobVertex vertex: JobGraphUtils.listSortedTopologicallyOperators(jobGraph, true, true)) {
-			//Resource Types the current Vertex is deployed on
+			//ResTypes the current Vertex is deployed on
 			ArrayList<Integer> actualResTypes = vertex.getDeployedSlotsResTypes();
-			//Resource Types the current Vertex should be deployed on this iteration
+			//ResTypes the current Vertex should be deployed on this iteration
 			ArrayList<Integer> desiredResTypes = overallDesResTypes.get(vertex.getID());
+			/*
 			if (actualResTypes.containsAll(desiredResTypes)) {
+				EDFLogger.log("EDF: la riconfigurazione del vertex "+vertex.getName()+" desiderata è stata applicata", LogLevel.INFO, EDFlinkApplicationManager.class);
+			}
+			*/
+			if (CollectionUtils.subtract(new ArrayList<>(desiredResTypes), actualResTypes).isEmpty()){
 				EDFLogger.log("EDF: la riconfigurazione del vertex "+vertex.getName()+" desiderata è stata applicata", LogLevel.INFO, EDFlinkApplicationManager.class);
 			}
 			else {
 				EDFLogger.log("EDF: la riconfigurazione del vertex "+vertex.getName()+" desiderata NON stata applicata", LogLevel.INFO, EDFlinkApplicationManager.class);
 			}
+
 			Reconfiguration reconf;
 			NodeType[] differedResTypes;
 			//there has been a scale-up
@@ -422,6 +424,49 @@ public class EDFlinkApplicationManager extends ApplicationManager implements Run
 		jobGraph.setTaskResTypes(currentDeployedSlotsResTypes);
 		EDFLogger.log("EDF: EXECUTE - Lista dei resTypes desiderati per il giro successivo: "+jobGraph.getTaskResTypes().toString(),
 			LogLevel.INFO, EDFlinkApplicationManager.class);
+	}
+
+	protected void reconfigureOperators2() {
+		HashMap<JobVertexID, ArrayList<Integer>> overallDesResTypes = jobGraph.getTaskResTypes();
+		boolean desReconf = true;
+		//JobGraphUtils.listSortedTopologicallyOperators() if SOURCE AND SINKS INCLUDED
+		for (JobVertex vertex: JobGraphUtils.listSortedTopologicallyOperators(jobGraph, true, true)) {
+			//ResTypes the current Vertex is deployed on
+			ArrayList<Integer> actualResTypes = vertex.getDeployedSlotsResTypes();
+			//ResTypes the current Vertex should be deployed on this iteration
+			ArrayList<Integer> desiredResTypes = overallDesResTypes.get(vertex.getID());
+
+			if (CollectionUtils.subtract(new ArrayList<>(desiredResTypes), actualResTypes).isEmpty()) {
+				EDFLogger.log("EDF: la riconfigurazione del vertex " + vertex.getName() + " desiderata è stata applicata", LogLevel.INFO, EDFlinkApplicationManager.class);
+				statistics.updateDesOpReconf(1);
+			} else {
+				EDFLogger.log("EDF: la riconfigurazione del vertex " + vertex.getName() + " desiderata NON stata applicata", LogLevel.INFO, EDFlinkApplicationManager.class);
+				desReconf = false;
+			}
+
+			Operator currOperator = perOperatorNameManagers.get(vertex.getName()).getOperator();
+			NodeType[] oldNodeTypes = currOperator.getInstances().toArray(new NodeType[currOperator.getInstances().size()]);
+			currOperator.reconfigure(Reconfiguration.scaleIn(oldNodeTypes));
+
+			NodeType[] newNodeTypes = new NodeType[actualResTypes.size()];
+			int i=0;
+			for (int newNodeTypeIndex: actualResTypes){
+				newNodeTypes[i] = ComputingInfrastructure.getInfrastructure().getNodeTypes()[newNodeTypeIndex];
+				i++;
+			}
+			currOperator.reconfigure((Reconfiguration.scaleOut(newNodeTypes)));
+			//notify
+			EDFlinkOperatorManagers.get(currOperator).notifyReconfigured();
+			//updating current deployed res types for this vertex
+			currentDeployedSlotsResTypes.put(vertex.getID(), actualResTypes);
+			EDFLogger.log("EDF: EXECUTE - Lista dei NodeTypes riconfigurati per Operator "+currOperator.getName()
+				+": "+ Arrays.toString(currOperator.getCurrentDeployment()), LogLevel.INFO, EDFlinkApplicationManager.class);
+		}
+		//update desired for actual. No deployment order should change in already existing subtasks
+		jobGraph.setTaskResTypes(currentDeployedSlotsResTypes);
+		EDFLogger.log("EDF: EXECUTE - Lista dei resTypes desiderati per il giro successivo: "+jobGraph.getTaskResTypes().toString(),
+			LogLevel.INFO, EDFlinkApplicationManager.class);
+		if (desReconf) statistics.updateDesReconf(1);
 	}
 
 	//RICAVA LE RICHIESTE DAGLI EDFLINKOM
