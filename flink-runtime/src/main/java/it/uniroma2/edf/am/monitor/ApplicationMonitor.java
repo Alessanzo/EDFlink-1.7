@@ -97,10 +97,10 @@ public class ApplicationMonitor {
 		for(List<JobVertex> path: JobGraphUtils.listSourceSinkPaths(jobGraph)){
 			double pathlatency = 0.0;
 			for (JobVertex vertex: path){
-				//if ((!vertex.isInputVertex()) && (!vertex.isOutputVertex())) {
+				if ((!vertex.isInputVertex()) && (!vertex.isOutputVertex())) {
 					double operatorlatency = getAvgOperatorLatency(vertex) + getAvgOperatorProcessingTime(vertex.getName());
 					pathlatency += operatorlatency;
-				//}
+				}
 			}
 			latency = Math.max(latency, pathlatency);
 		}
@@ -278,10 +278,14 @@ public class ApplicationMonitor {
 				String value = jedis.get(singleKey);
 				String[] fields = singleKey.split("\\.");
 				//EDFLogger.log("EDF: Latency key: "+ singleKey + "Latency value: " + value + " Latency fields: " + fields[3], LogLevel.INFO, ApplicationMonitor.class);
-				Double[] subtaskLatencySum = subtaskLatencies.get(Integer.parseInt(fields[3]));
-				//EDFLogger.log("EDF: Latency sum " + subtaskLatencySum, LogLevel.INFO, ApplicationMonitor.class);
-				subtaskLatencySum[0]++;
-				subtaskLatencySum[1]+= Double.parseDouble(value);
+				int metricSubtask = Integer.parseInt(fields[3]);
+				//if metric refers to a subtask in the parallelism range (0, parallelism-1)
+				if (metricSubtask < numSubtask) {
+					Double[] subtaskLatencySum = subtaskLatencies.get(Integer.parseInt(fields[3]));
+					//EDFLogger.log("EDF: Latency sum " + subtaskLatencySum, LogLevel.INFO, ApplicationMonitor.class);
+					subtaskLatencySum[0]++;
+					subtaskLatencySum[1] += Double.parseDouble(value);
+				}
 			}
 			cur = scanResult.getCursor();
 		} while (!cur.equals(SCAN_POINTER_START));

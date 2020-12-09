@@ -42,9 +42,6 @@ public class EDFlink extends EDF {
 
 		final int numOperators = operators.size();
 
-		//new appMonitor to pass to both AM and EDFlink OM's
-		//ApplicationMonitor appMonitor = new ApplicationMonitor(jobGraph, configuration);
-
 		operatorManagers = new HashMap<>(numOperators);
 		edFlinkOperatorManagers = new HashMap<>(numOperators);
 		for (Operator op : operators) {

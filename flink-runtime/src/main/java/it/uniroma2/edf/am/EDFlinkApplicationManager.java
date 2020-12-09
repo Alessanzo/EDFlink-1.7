@@ -107,7 +107,7 @@ public class EDFlinkApplicationManager extends ApplicationManager implements Run
 			perOperatorNameID.put(vertex.getName(), vertex.getID());
 		}
 		//initializing current resTypes with initial desired, that will be actual
-		this.currentDeployedSlotsResTypes = jobGraph.getTaskResTypes();
+		this.currentDeployedSlotsResTypes = new HashMap<>(jobGraph.getTaskResTypes());
 
 		startOperatorManagers();
 
@@ -176,7 +176,7 @@ public class EDFlinkApplicationManager extends ApplicationManager implements Run
 			if ((round % 2) == 0) {
 				analyze(endToEndLatency); //calculate costs
 				Map<Operator, Reconfiguration> reconfRequests = plan2(); //take requests
-				reconfRequests.forEach((op,req) -> EDFLogger.log("EDF: PLAN - reconfigurations: "+req.toString(),
+				reconfRequests.forEach((op,req) -> EDFLogger.log("EDF: PLAN - reconfigurations : "+req.toString(),
 					LogLevel.INFO, EDFlinkApplicationManager.class)); //print requests taken
 				/*
 				for (JobVertex vertex: JobGraphUtils.listSortedTopologicallyOperators(jobGraph, true, true)) {
@@ -273,12 +273,10 @@ public class EDFlinkApplicationManager extends ApplicationManager implements Run
 		boolean sloViolated = false;
 		if (endToEndLatency > LATENCY_SLO) {
 			sloViolated = true;
-			//metricViolations.update(1);
 			statistics.updateViolations(1);
 			iterationCost += this.wSLO;
 		}
 		double deploymentCost = application.computeDeploymentCost();
-		//metricResCost.update(deploymentCost);
 		statistics.updateResCost(deploymentCost);
 		double cRes = (deploymentCost / application.computeMaxDeploymentCost());
 		iterationCost += cRes * this.wRes;
@@ -421,7 +419,7 @@ public class EDFlinkApplicationManager extends ApplicationManager implements Run
 			currentDeployedSlotsResTypes.put(vertex.getID(), actualResTypes);
 		}
 		//update desired for actual. No deployment order should change in already existing subtasks
-		jobGraph.setTaskResTypes(currentDeployedSlotsResTypes);
+		jobGraph.setTaskResTypes(new HashMap<>(currentDeployedSlotsResTypes));
 		EDFLogger.log("EDF: EXECUTE - Lista dei resTypes desiderati per il giro successivo: "+jobGraph.getTaskResTypes().toString(),
 			LogLevel.INFO, EDFlinkApplicationManager.class);
 	}
@@ -435,6 +433,9 @@ public class EDFlinkApplicationManager extends ApplicationManager implements Run
 			ArrayList<Integer> actualResTypes = vertex.getDeployedSlotsResTypes();
 			//ResTypes the current Vertex should be deployed on this iteration
 			ArrayList<Integer> desiredResTypes = overallDesResTypes.get(vertex.getID());
+			EDFLogger.log("EDF: EXECUTE Reconfigure - la Riconfigurazione desiderata per il Vertex "+vertex.getName()+
+				"è "+ desiredResTypes.toString()+" mentre quella effettuata è "+actualResTypes.toString(), LogLevel.INFO,
+				EDFlinkApplicationManager.class);
 
 			if (CollectionUtils.subtract(new ArrayList<>(desiredResTypes), actualResTypes).isEmpty()) {
 				EDFLogger.log("EDF: la riconfigurazione del vertex " + vertex.getName() + " desiderata è stata applicata", LogLevel.INFO, EDFlinkApplicationManager.class);
@@ -458,14 +459,16 @@ public class EDFlinkApplicationManager extends ApplicationManager implements Run
 			//notify
 			EDFlinkOperatorManagers.get(currOperator).notifyReconfigured();
 			//updating current deployed res types for this vertex
-			currentDeployedSlotsResTypes.put(vertex.getID(), actualResTypes);
+			currentDeployedSlotsResTypes.put(vertex.getID(), new ArrayList<>(actualResTypes));
 			EDFLogger.log("EDF: EXECUTE - Lista dei NodeTypes riconfigurati per Operator "+currOperator.getName()
 				+": "+ Arrays.toString(currOperator.getCurrentDeployment()), LogLevel.INFO, EDFlinkApplicationManager.class);
 		}
 		//update desired for actual. No deployment order should change in already existing subtasks
-		jobGraph.setTaskResTypes(currentDeployedSlotsResTypes);
+		jobGraph.setTaskResTypes(new HashMap<>(currentDeployedSlotsResTypes));
+		/*
 		EDFLogger.log("EDF: EXECUTE - Lista dei resTypes desiderati per il giro successivo: "+jobGraph.getTaskResTypes().toString(),
 			LogLevel.INFO, EDFlinkApplicationManager.class);
+		 */
 		if (desReconf) statistics.updateDesReconf(1);
 	}
 
@@ -493,7 +496,8 @@ public class EDFlinkApplicationManager extends ApplicationManager implements Run
 		return this.planReconfigurations(omMonitoringInfo, operatorManagers);
 	}
 
-	public void fillDesiredSchedulingReconf(Map<Operator, Reconfiguration> reconfigurations){
+	public void fillDesiredSchedulingReconf2(Map<Operator, Reconfiguration> reconfigurations){
+		request.clear();
 		for (Map.Entry<Operator, Reconfiguration> reconf: reconfigurations.entrySet()){
 			Operator opToReconf = reconf.getKey();
 			Reconfiguration opReconf = reconf.getValue();
@@ -514,40 +518,34 @@ public class EDFlinkApplicationManager extends ApplicationManager implements Run
 				request.put(operatorID.toString(), newParallelism);
 			}
 		}
-		jobGraph.getTaskResTypes().forEach((ver,resTypes)->EDFLogger.log(
-			"EDF: EXECUTE - resType desiderate dai Task di "+ver.toString()+": "+resTypes.toString(),
-			LogLevel.INFO, EDFlinkApplicationManager.class));
 	}
 
-	/*
-	private void registerMetrics() {
-		Statistics statistics = Statistics.getInstance();
-
-		final String STAT_LATENCY_VIOLATIONS = "Violations";
-		final String STAT_RECONFIGURATIONS = "Reconfigurations";
-		final String STAT_RESOURCES_COST = "ResourcesCost";
-		final String STAT_APPLICATION_COST_AVG = "AvgCost";
-
-		this.metricViolations = new CountMetric(STAT_LATENCY_VIOLATIONS);
-		statistics.registerMetric(metricViolations);
-
-		this.metricAvgCost = new RealValuedMetric(STAT_APPLICATION_COST_AVG, true, true);
-		statistics.registerMetric(metricAvgCost);
-
-		this.metricReconfigurations = new CountMetric(STAT_RECONFIGURATIONS);
-		statistics.registerMetric(metricReconfigurations);
-
-		this.metricResCost = new RealValuedMetric(STAT_RESOURCES_COST);
-		statistics.registerMetric(metricResCost);
-
-		this.metricDeployedInstances = new RealValuedMetric[ComputingInfrastructure.getInfrastructure().getNodeTypes().length];
-		for (int i = 0; i < ComputingInfrastructure.getInfrastructure().getNodeTypes().length; i++) {
-			this.metricDeployedInstances[i]	 = new RealValuedMetric("InstancesType" + i);
-			statistics.registerMetric(this.metricDeployedInstances[i]);
+	public void fillDesiredSchedulingReconf(Map<Operator, Reconfiguration> reconfigurations){
+		request.clear();
+		for (Map.Entry<Operator, Reconfiguration> reconf: reconfigurations.entrySet()){
+			Operator opToReconf = reconf.getKey();
+			Reconfiguration opReconf = reconf.getValue();
+			JobVertexID operatorID = perOperatorNameID.get(opToReconf.getName());
+			int newParallelism = jobGraph.getTaskResTypes().get(operatorID).size();
+			int resTypeToModify;
+			if (opReconf.getInstancesToAdd() != null) {
+				for (NodeType nodeTypeToModify: opReconf.getInstancesToAdd()){
+					resTypeToModify = nodeTypeToModify.getIndex();
+					jobGraph.getTaskResTypes().get(operatorID).add(resTypeToModify);
+					newParallelism ++;
+				}
+				request.put(operatorID.toString(), newParallelism);
+			}
+			else if (reconf.getValue().getInstancesToRemove() != null) {
+				for (NodeType nodeTypeToModify: opReconf.getInstancesToRemove()){
+					resTypeToModify = nodeTypeToModify.getIndex();
+					jobGraph.getTaskResTypes().get(operatorID).remove(resTypeToModify);
+					newParallelism --;
+				}
+				request.put(operatorID.toString(), newParallelism);
+			}
 		}
 	}
-
-	 */
 
 	public void waitForTasksDeployment() {
 		while (deployedCounter.get() != jobGraph.getNumberOfVertices()) {
@@ -558,15 +556,6 @@ public class EDFlinkApplicationManager extends ApplicationManager implements Run
 					Thread.currentThread().interrupt();
 					EDFLogger.log("Thread interrupted " + e.getMessage(), LogLevel.ERROR, EDFlinkApplicationManager.class);
 				}
-			}
-		}
-		for (JobVertex vertex: jobGraph.getVerticesSortedTopologicallyFromSources()){
-			ArrayList<Integer> resTypes = vertex.getDeployedSlotsResTypes();
-			int i=1;
-			for (int resType: resTypes) {
-				EDFLogger.log("EDF: EXECUTE - deployment: Vertex " + vertex.getName() + " Subtask " + i + " deployedResType " + resType,
-					LogLevel.INFO, EDFlinkApplicationManager.class);
-				i++;
 			}
 		}
 	}

@@ -238,19 +238,24 @@ under the License.
 			<groupId>com.google.guava</groupId>
 			<artifactId>guava</artifactId>
 			<version>28.1-jre</version>
+			<scope>compile</scope>
 		</dependency>
+
 
 		<dependency>
 			<groupId>org.nd4j</groupId>
 			<artifactId>nd4j-native-platform</artifactId>
 			<version>0.9.1</version>
+			<scope>compile</scope>
 		</dependency>
 
 		<dependency>
 			<groupId>org.deeplearning4j</groupId>
 			<artifactId>deeplearning4j-core</artifactId>
 			<version>0.9.1</version>
+			<scope>compile</scope>
 		</dependency>
+
 
 		<dependency>
 			<groupId>com.EDF.uniroma2</groupId>
@@ -353,10 +358,12 @@ under the License.
 			<artifactId>akka-testkit_${scala.binary.version}</artifactId>
 		</dependency>
 
+		<!--
 		<dependency>
 			<groupId>org.reflections</groupId>
 			<artifactId>reflections</artifactId>
 		</dependency>
+		-->
 
 		<!-- Used only for additional logging. Optional because of unclear EPL 1.0 license compatibility. -->
 		<dependency>
