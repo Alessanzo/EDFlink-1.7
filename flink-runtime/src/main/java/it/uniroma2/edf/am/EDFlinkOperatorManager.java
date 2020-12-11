@@ -1,5 +1,8 @@
 package it.uniroma2.edf.am;
 
+import it.uniroma2.dspsim.Configuration;
+import it.uniroma2.dspsim.ConfigurationKeys;
+import it.uniroma2.dspsim.dsp.Operator;
 import it.uniroma2.dspsim.dsp.Reconfiguration;
 import it.uniroma2.dspsim.dsp.edf.om.OMMonitoringInfo;
 import it.uniroma2.dspsim.dsp.edf.om.OperatorManager;
@@ -11,8 +14,12 @@ import it.uniroma2.dspsim.infrastructure.ComputingInfrastructure;
 import it.uniroma2.dspsim.infrastructure.NodeType;
 import it.uniroma2.edf.EDFLogger;
 import it.uniroma2.edf.am.monitor.ApplicationMonitor;
-import org.apache.flink.configuration.Configuration;
 import org.apache.flink.shaded.netty4.io.netty.handler.logging.LogLevel;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.OptionalDouble;
 
 public class EDFlinkOperatorManager implements Runnable{
 
@@ -41,9 +48,15 @@ public class EDFlinkOperatorManager implements Runnable{
 				Thread.sleep(10000);
 			} catch (InterruptedException e) {
 			}
-			double operatorInputRate = appMonitor.getOperatorInputRate(wrappedOM.getOperator().getName());
+			int currentParallelism = wrappedOM.getOperator().getInstances().size();
+			getIrAndUtilization(wrappedOM.getOperator());
+			double operatorInputRate = appMonitor.getOperatorInputRate(wrappedOM.getOperator().getName(), currentParallelism);
+			double cpuUsage = appMonitor.getOperatorCpuUsage(wrappedOM.getOperator().getName(), currentParallelism);
+
 			EDFLogger.log("EDF: EDFLINKOM monitored for Operator "+getWrappedOM().getOperator().getName()+
-				" this Input Rate: "+operatorInputRate, LogLevel.INFO, EDFlinkOperatorManager.class);
+				" with current parallelism " + currentParallelism + " this Input Rate: "+operatorInputRate +
+					" and this CPUUsage: "+ cpuUsage, LogLevel.INFO, EDFlinkOperatorManager.class);
+			//double cpuUsage = appMonitor.getOperatorCpuUsage(wrappedOM.getOperator());
 			final double u = wrappedOM.getOperator().utilization(operatorInputRate);
 			OMMonitoringInfo monitoringInfo = new OMMonitoringInfo();
 			monitoringInfo.setInputRate(operatorInputRate);
@@ -70,6 +83,46 @@ public class EDFlinkOperatorManager implements Runnable{
 			}
 		}
 		recofigured = false;
+	}
+
+	public OMMonitoringInfo getIrAndUtilization(Operator operator){
+		String operatorName = operator.getName();
+		int currentParallelism = operator.getInstances().size();
+		double operatorInputRate = 0;
+		double operatorCpuUsage = 0;
+
+		ArrayList<Double> subtaskInputRates = appMonitor.getSubtaskInputRates(operatorName, currentParallelism);
+		ArrayList<Double> subtaskCpuUsages = appMonitor.getSubtaskCpuUsages(operatorName, currentParallelism);
+ 		ArrayList<Double> subtaskIRFractions = new ArrayList<>();
+
+		for (double subtaskIR: subtaskInputRates)
+			operatorInputRate+=subtaskIR;
+
+		String mode = Configuration.getInstance().getString(
+			ConfigurationKeys.OPERATOR_VALUES_COMPUTING_CASE_KEY, "avg");
+
+		if ((operatorInputRate != 0.0) && (mode.equals("avg"))) {
+			for (int i=0; i<currentParallelism;i++) {
+				subtaskIRFractions.add(subtaskInputRates.get(i) / operatorInputRate);
+				operatorCpuUsage += (subtaskIRFractions.get(i) * subtaskCpuUsages.get(i));
+			}
+		}
+		else if (mode.equals("worst")){
+			operatorCpuUsage =  Collections.max(subtaskCpuUsages);
+		}
+		else {
+			for (double subtaskCpuUsage: subtaskCpuUsages)
+				operatorCpuUsage += subtaskCpuUsage;
+			operatorCpuUsage = operatorCpuUsage / currentParallelism;
+		}
+		OMMonitoringInfo monitoringInfo = new OMMonitoringInfo();
+		monitoringInfo.setInputRate(operatorInputRate);
+		monitoringInfo.setCpuUtilization(operatorCpuUsage);
+
+		EDFLogger.log("EDF: EDFLINKOM with new method monitored for Operator"+operatorName+
+			" with current parallelism " + currentParallelism + " this Input Rate: "+operatorInputRate +
+			" and this CPUUsage: "+ operatorCpuUsage, LogLevel.INFO, EDFlinkOperatorManager.class);
+		return monitoringInfo;
 	}
 
 	public OMRequest getReconfRequest() {

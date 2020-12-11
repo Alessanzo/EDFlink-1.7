@@ -21,6 +21,10 @@ import org.apache.flink.annotation.Internal;
 import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 
+import java.lang.management.ManagementFactory;
+import java.lang.management.ThreadMXBean;
+import java.util.concurrent.TimeUnit;
+
 /**
  * A {@link StreamOperator} for executing {@link MapFunction MapFunctions}.
  */
@@ -30,6 +34,9 @@ public class StreamMap<IN, OUT>
 		implements OneInputStreamOperator<IN, OUT> {
 
 	private static final long serialVersionUID = 1L;
+	//EDF
+	private long refTime = 0;
+	private long refCpuTime = 0;
 
 	public StreamMap(MapFunction<IN, OUT> mapper) {
 		super(mapper);
@@ -47,5 +54,13 @@ public class StreamMap<IN, OUT>
 		final long t1 = System.currentTimeMillis();
 		final long executionTimeMillis = t1-t0;
 		executionTimeHistogram.update(executionTimeMillis);
+
+		if ((t1 - TimeUnit.NANOSECONDS.toMillis(refTime)) > 5*1000){
+			long currTime = System.nanoTime();
+			long currCpuTime = ManagementFactory.getThreadMXBean().getCurrentThreadCpuTime();
+			cpuUsage = (double) (currCpuTime - refCpuTime) / (double) (currTime - refTime);
+			refTime = currTime;
+			refCpuTime = currCpuTime;
+		}
 	}
 }

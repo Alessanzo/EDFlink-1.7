@@ -63,4 +63,5 @@ public class MetricNames {
 	public static final String MEMORY_MAX = "Max";
 
 	public static final String EXECUTION_TIME = "executionTime";
+	public static final String CPU_USAGE = "cpuUsage";
 }

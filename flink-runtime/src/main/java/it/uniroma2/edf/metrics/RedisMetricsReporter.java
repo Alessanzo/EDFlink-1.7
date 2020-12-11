@@ -96,15 +96,20 @@ public class RedisMetricsReporter implements MetricReporter, Scheduled {
 	// This is called every 10 seconds (at least using default configuration)
 	@Override
 	public void report() {
-		if (logEverything) {
+		/*
 			for (Map.Entry<Counter, String> metric : counters.entrySet()) {
 				LOG.info("{}: {}", metric.getValue(), metric.getKey().getCount());
 			}
-
+*/
 			for (Map.Entry<Gauge<?>, String> metric : gauges.entrySet()) {
-				LOG.info("{}: {}", metric.getValue(), metric.getKey().getValue().toString());
+				//LOG.info("{}: {}", metric.getValue(), metric.getKey().getValue().toString());
+				final String identifier = metric.getValue();
+				if (identifier.contains(MetricNames.CPU_USAGE)) {
+					LOG.info("{}: {}", metric.getValue(), metric.getKey().getValue().toString());
+					Double cpuUsage = (Double) metric.getKey().getValue();
+					reportCpuUsage(identifier, cpuUsage);
+				}
 			}
-		}
 
 		for (Map.Entry<Meter, String> metric : meters.entrySet()) {
 			if (logEverything) {
@@ -146,6 +151,7 @@ public class RedisMetricsReporter implements MetricReporter, Scheduled {
 			stats.getQuantile(0.98), stats.getQuantile(0.99), stats.getQuantile(0.999));
 	}
 
+
 	private void reportInputRate (String metricId, double rate)
 	{
 		// Format: <hostname>.taskmanager.<taskmanagerid>.<jobid>.<operatorname>.<subtaskid>.<metric>
@@ -180,6 +186,17 @@ public class RedisMetricsReporter implements MetricReporter, Scheduled {
 		} else {
 			LOG.info("J={}, operator={}, subtask={}, output rate = {}", jobId, operator, subtaskId, rate);
 		}
+	}
+
+	private void reportCpuUsage (String metricId, double cpuUsage) {
+		String fields[] = metricId.split("\\.");
+
+		final String jobId = fields[3];
+		final String operator = fields[4];
+		final String subtaskId = fields[5];
+
+		String key = String.format("cpuUsage.%s.%s.%s", jobId, operator, subtaskId);
+		jedis.set(key, String.valueOf(cpuUsage));
 	}
 
 	private void reportExecutionTime (String metricId, HistogramStatistics stats)

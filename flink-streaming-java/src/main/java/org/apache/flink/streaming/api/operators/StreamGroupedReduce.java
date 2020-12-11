@@ -24,6 +24,8 @@ import org.apache.flink.api.common.state.ValueStateDescriptor;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 
+import java.lang.management.ManagementFactory;
+
 /**
  * A {@link StreamOperator} for executing a {@link ReduceFunction} on a
  * {@link org.apache.flink.streaming.api.datastream.KeyedStream}.
@@ -34,6 +36,9 @@ public class StreamGroupedReduce<IN> extends AbstractUdfStreamOperator<IN, Reduc
 		implements OneInputStreamOperator<IN, IN> {
 
 	private static final long serialVersionUID = 1L;
+	//EDF
+	private long refTime = 0;
+	private long refCpuTime = 0;
 
 	private static final String STATE_NAME = "_op_state";
 
@@ -74,5 +79,14 @@ public class StreamGroupedReduce<IN> extends AbstractUdfStreamOperator<IN, Reduc
 		final long t1 = System.currentTimeMillis();
 		final long executionTimeMillis = t1-t0;
 		executionTimeHistogram.update(executionTimeMillis);
+
+		if ((t1 - refTime) > 5*1000){
+			long currTime = System.nanoTime();
+			long currCpuTime = ManagementFactory.getThreadMXBean().getCurrentThreadCpuTime();
+			cpuUsage = (double) (currCpuTime - refCpuTime) / (double) (currTime - refTime);
+			refTime = currTime;
+			refCpuTime = currCpuTime;
+		}
+
 	}
 }

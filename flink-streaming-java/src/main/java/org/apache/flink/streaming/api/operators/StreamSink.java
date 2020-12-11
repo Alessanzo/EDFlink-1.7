@@ -24,6 +24,8 @@ import org.apache.flink.streaming.runtime.streamrecord.LatencyMarker;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.streaming.runtime.tasks.ProcessingTimeService;
 
+import java.lang.management.ManagementFactory;
+
 /**
  * A {@link StreamOperator} for executing {@link SinkFunction SinkFunctions}.
  */
@@ -32,6 +34,9 @@ public class StreamSink<IN> extends AbstractUdfStreamOperator<Object, SinkFuncti
 		implements OneInputStreamOperator<IN, Object> {
 
 	private static final long serialVersionUID = 1L;
+	//EDF
+	private long refTime = 0;
+	private long refCpuTime = 0;
 
 	private transient SimpleContext sinkContext;
 
@@ -62,6 +67,14 @@ public class StreamSink<IN> extends AbstractUdfStreamOperator<Object, SinkFuncti
 		final long t1 = System.currentTimeMillis();
 		final long executionTimeMillis = t1-t0;
 		executionTimeHistogram.update(executionTimeMillis);
+
+		if ((t1 - refTime) > 5*1000){
+			long currTime = System.nanoTime();
+			long currCpuTime = ManagementFactory.getThreadMXBean().getCurrentThreadCpuTime();
+			cpuUsage = (double) (currCpuTime - refCpuTime) / (double) (currTime - refTime);
+			refTime = currTime;
+			refCpuTime = currCpuTime;
+		}
 	}
 
 	@Override

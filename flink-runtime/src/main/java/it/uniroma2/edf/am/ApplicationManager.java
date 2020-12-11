@@ -198,7 +198,7 @@ public class ApplicationManager implements Runnable {
 			EDFLogger.log("EDF: processingTime: " + processingTime, LogLevel.INFO, ApplicationManager.class);
 			EDFLogger.log("EDF: avgLatency + processingTime: " + (processingTime+avgOperatorLatency), LogLevel.INFO, ApplicationManager.class);
 
-			double endToEndLatency = appMonitor.endToEndLatency();
+			double endToEndLatency = appMonitor.endToEndLatencySourcesSinks();
 			EDFLogger.log("EDF: Simulation-Like EndToEndLatency: " + endToEndLatency,
 				LogLevel.INFO, it.uniroma2.edf.am.ApplicationManager.class);
 

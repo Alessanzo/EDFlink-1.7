@@ -238,7 +238,7 @@ public class EDFlinkApplicationManager extends ApplicationManager implements Run
 			 */
 			double ir = appMonitor.getSubtaskInputRate(vertex.getName(), String.valueOf(0));
 			EDFLogger.log("EDF: Input Rate: " + ir, LogLevel.INFO, it.uniroma2.edf.am.ApplicationManager.class);
-			double operatorIr = appMonitor.getOperatorInputRate(vertex.getName());
+			double operatorIr = appMonitor.getOperatorInputRate(vertex.getName(), vertex.getParallelism());
 			double appIr = appMonitor.getApplicationInputRate();
 			double operatorLatency = appMonitor.getAvgLatencyUpToOperator(vertex);
 			double avgOperatorLatency = appMonitor.getAvgOperatorLatency(vertex);

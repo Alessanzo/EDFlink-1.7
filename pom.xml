@@ -605,7 +605,7 @@ under the License.
 				<groupId>org.reflections</groupId>
 				<artifactId>reflections</artifactId>
 				<version>0.9.10</version>
-				<scope>test</scope>
+				<scope>compile</scope>
 			</dependency>
 
 			<dependency>

@@ -22,6 +22,8 @@ import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.api.java.tuple.Tuple;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 
+import java.lang.management.ManagementFactory;
+
 /**
  * A {@link StreamOperator} for executing projections on streams.
  */
@@ -31,6 +33,9 @@ public class StreamProject<IN, OUT extends Tuple>
 		implements OneInputStreamOperator<IN, OUT> {
 
 	private static final long serialVersionUID = 1L;
+	//EDF
+	private long refTime = 0;
+	private long refCpuTime = 0;
 
 	private TypeSerializer<OUT> outSerializer;
 	private int[] fields;
@@ -60,6 +65,14 @@ public class StreamProject<IN, OUT extends Tuple>
 		final long t1 = System.currentTimeMillis();
 		final long executionTimeMillis = t1-t0;
 		executionTimeHistogram.update(executionTimeMillis);
+
+		if ((t1 - refTime) > 5*1000){
+			long currTime = System.nanoTime();
+			long currCpuTime = ManagementFactory.getThreadMXBean().getCurrentThreadCpuTime();
+			cpuUsage = (double) (currCpuTime - refCpuTime) / (double) (currTime - refTime);
+			refTime = currTime;
+			refCpuTime = currCpuTime;
+		}
 	}
 
 	@Override

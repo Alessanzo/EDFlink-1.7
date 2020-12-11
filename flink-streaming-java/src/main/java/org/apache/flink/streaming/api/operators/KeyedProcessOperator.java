@@ -27,6 +27,8 @@ import org.apache.flink.streaming.api.functions.KeyedProcessFunction;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.util.OutputTag;
 
+import java.lang.management.ManagementFactory;
+
 import static org.apache.flink.util.Preconditions.checkNotNull;
 import static org.apache.flink.util.Preconditions.checkState;
 
@@ -39,6 +41,9 @@ public class KeyedProcessOperator<K, IN, OUT>
 		implements OneInputStreamOperator<IN, OUT>, Triggerable<K, VoidNamespace> {
 
 	private static final long serialVersionUID = 1L;
+	//EDF
+	private long refTime = 0;
+	private long refCpuTime = 0;
 
 	private transient TimestampedCollector<OUT> collector;
 
@@ -93,6 +98,13 @@ public class KeyedProcessOperator<K, IN, OUT>
 		final long executionTimeMillis = t1-t0;
 		executionTimeHistogram.update(executionTimeMillis);
 		//LOG.info("[EDF] Execution time: {}", executionTimeMillis);
+		if ((t1 - refTime) > 5*1000){
+			long currTime = System.nanoTime();
+			long currCpuTime = ManagementFactory.getThreadMXBean().getCurrentThreadCpuTime();
+			cpuUsage = (double) (currCpuTime - refCpuTime) / (double) (currTime - refTime);
+			refTime = currTime;
+			refCpuTime = currCpuTime;
+		}
 	}
 
 	private void invokeUserFunction(

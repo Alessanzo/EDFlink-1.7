@@ -32,6 +32,7 @@ import org.apache.flink.configuration.MetricOptions;
 import org.apache.flink.core.fs.CloseableRegistry;
 import org.apache.flink.core.memory.DataOutputViewStreamWrapper;
 import org.apache.flink.metrics.Counter;
+import org.apache.flink.metrics.Gauge;
 import org.apache.flink.metrics.Histogram;
 import org.apache.flink.metrics.MetricGroup;
 import org.apache.flink.runtime.checkpoint.CheckpointOptions;
@@ -159,6 +160,8 @@ public abstract class AbstractStreamOperator<OUT>
 	// EDF
 	protected transient Histogram executionTimeHistogram;
 
+	protected double cpuUsage;
+
 	// ---------------- time handler ------------------
 
 	protected transient InternalTimeServiceManager<?> timeServiceManager;
@@ -222,7 +225,16 @@ public abstract class AbstractStreamOperator<OUT>
 				container.getIndexInSubtaskGroup(),
 				getOperatorID(),
 				granularity);
+
+			//EDF
 			this.executionTimeHistogram = metrics.histogram(MetricNames.EXECUTION_TIME, new DescriptiveStatisticsHistogram(128));
+			metrics.gauge(MetricNames.CPU_USAGE, new Gauge<Double>() {
+				@Override
+				public Double getValue() {
+					return cpuUsage;
+				}
+			});
+
 		} catch (Exception e) {
 			LOG.warn("An error occurred while instantiating latency metrics.", e);
 			this.latencyStats = new LatencyStats(

@@ -25,6 +25,8 @@ import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.streaming.runtime.tasks.ProcessingTimeService;
 import org.apache.flink.util.OutputTag;
 
+import java.lang.management.ManagementFactory;
+
 import static org.apache.flink.util.Preconditions.checkState;
 
 /**
@@ -37,6 +39,9 @@ public class ProcessOperator<IN, OUT>
 		implements OneInputStreamOperator<IN, OUT> {
 
 	private static final long serialVersionUID = 1L;
+	//EDF
+	private long refTime = 0;
+	private long refCpuTime = 0;
 
 	private transient TimestampedCollector<OUT> collector;
 
@@ -71,8 +76,16 @@ public class ProcessOperator<IN, OUT>
 
 		// EDF
 		final long t1 = System.currentTimeMillis();
-		final long executionTimeMillis = t1-t0; // TODO
+		final long executionTimeMillis = t1-t0;
 		executionTimeHistogram.update(executionTimeMillis);
+
+		if ((t1 - refTime) > 5*1000){
+			long currTime = System.nanoTime();
+			long currCpuTime = ManagementFactory.getThreadMXBean().getCurrentThreadCpuTime();
+			cpuUsage = (double) (currCpuTime - refCpuTime) / (double) (currTime - refTime);
+			refTime = currTime;
+			refCpuTime = currCpuTime;
+		}
 	}
 
 	@Override

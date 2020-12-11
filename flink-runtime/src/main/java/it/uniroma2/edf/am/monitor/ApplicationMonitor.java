@@ -39,9 +39,7 @@ public class ApplicationMonitor {
 
 
 
-	/* Statistics */
 
-	private Map<String, Map<Integer, Double>> operator2subtasksThroughput = new HashMap<>();
 
 	public ApplicationMonitor(JobGraph jobGraph, Configuration configuration)
 	{
@@ -91,14 +89,14 @@ public class ApplicationMonitor {
 		return jedisPool.getResource();
 	}
 
-	//TODO ESCLUDERE LE SORGENTI E SINK?
+	//ESCLUDO SORGENTE E SINK DALLE LATENZE SUL PERCORSO
 	public double endToEndLatency() {
 		double latency = 0.0;
 		for(List<JobVertex> path: JobGraphUtils.listSourceSinkPaths(jobGraph)){
 			double pathlatency = 0.0;
 			for (JobVertex vertex: path){
 				if ((!vertex.isInputVertex()) && (!vertex.isOutputVertex())) {
-					double operatorlatency = getAvgOperatorLatency(vertex) + getAvgOperatorProcessingTime(vertex.getName());
+					double operatorlatency = getAvgOperatorLatency(vertex) + getAvgOperatorProcessingTime(vertex);
 					pathlatency += operatorlatency;
 				}
 			}
@@ -107,12 +105,51 @@ public class ApplicationMonitor {
 		return  latency;
 	}
 
+	public double endToEndLatencySourcesSinks() {
+		double latency = 0.0;
+		for(List<JobVertex> path: JobGraphUtils.listSourceSinkPaths(jobGraph)){
+			double pathlatency = 0.0;
+			for (JobVertex vertex: path){
+				double operatorlatency = getAvgOperatorLatency(vertex) + getAvgOperatorProcessingTime(vertex);
+				pathlatency += operatorlatency;
+			}
+			latency = Math.max(latency, pathlatency);
+		}
+		return  latency;
+	}
+
+
+
 	public double getSubtaskInputRate(String operator, String subtaskId) {
 		String key = String.format("inputRate.%s.%s.%s", jobGraph.getName(), operator, subtaskId);
 		log.info("key: " + key);
 		String res = jedis.get(key);
 		if(res == null) return -1;
 		return Double.parseDouble(res);
+	}
+
+	public ArrayList<Double> getSubtaskInputRates(String operator, int parallelism){
+		ArrayList<Double> subtaskInputRates = new ArrayList<>();
+		Jedis jedis = jedisPool.getResource();
+		String key = String.format("inputRate.%s.%s.*", jobGraph.getName(), operator);
+		ScanParams scanParams = new ScanParams().match(key);
+		String cur = SCAN_POINTER_START;
+		double inputRatesSum = 0.0;
+		do {
+			ScanResult<String> scanResult = jedis.scan(cur, scanParams);
+			// work with result
+			for (String singleKey: scanResult.getResult()){
+				int subtaskIndex = Integer.parseInt(singleKey.split("\\.")[3]);
+
+				if (subtaskIndex < parallelism) {
+					String value = jedis.get(singleKey);
+					subtaskInputRates.add(Double.parseDouble(value));
+				}
+			}
+			cur = scanResult.getCursor();
+		} while (!cur.equals(SCAN_POINTER_START));
+		jedis.close();
+		return subtaskInputRates;
 	}
 
 	public double getOperatorInputRate(String operator) {
@@ -128,6 +165,29 @@ public class ApplicationMonitor {
 			for (String singleKey: scanResult.getResult()){
 				String value = jedis.get(singleKey);
 				inputRatesSum += Double.parseDouble(value);
+			}
+			cur = scanResult.getCursor();
+		} while (!cur.equals(SCAN_POINTER_START));
+		jedis.close();
+		return inputRatesSum;
+	}
+
+	public double getOperatorInputRate(String operator, int parallelism) {
+		Jedis jedis = jedisPool.getResource();
+		String key = String.format("inputRate.%s.%s.*", jobGraph.getName(), operator);
+		ScanParams scanParams = new ScanParams().match(key);
+		String cur = SCAN_POINTER_START;
+		double inputRatesSum = 0.0;
+		do {
+			ScanResult<String> scanResult = jedis.scan(cur, scanParams);
+			// work with result
+			for (String singleKey: scanResult.getResult()){
+				int subtaskIndex = Integer.parseInt(singleKey.split("\\.")[3]);
+
+				if (subtaskIndex < parallelism) {
+					String value = jedis.get(singleKey);
+					inputRatesSum += Double.parseDouble(value);
+				}
 			}
 			cur = scanResult.getCursor();
 		} while (!cur.equals(SCAN_POINTER_START));
@@ -170,21 +230,84 @@ public class ApplicationMonitor {
 		return inputRatesSum;
 	}
 
-	public double getApplicationThroughput()
-	{
-		double rate = 0.0;
+	public ArrayList<Double> getSubtaskCpuUsages (String operator, int parallelism) {
+		ArrayList<Double> subtaskCpuUsages = new ArrayList<>();
+		Jedis jedis = jedisPool.getResource();
+		String key = String.format("cpuUsage.%s.%s.*", jobGraph.getName(), operator);
+		ScanParams scanParams = new ScanParams().match(key);
+		String cur = SCAN_POINTER_START;
+		do {
+			ScanResult<String> scanResult = jedis.scan(cur, scanParams);
 
-		for (JobVertex sink : sinks) {
-			String operatorId = sink.getName();
-			if (!operator2subtasksThroughput.containsKey(operatorId))
-				return 0.0; /* no measurements available yet */
-
-			for (Map.Entry<Integer, Double> e : operator2subtasksThroughput.get(operatorId).entrySet()) {
-				rate += e.getValue();
+			// work with result
+			for (String singleKey: scanResult.getResult()){
+				int subtaskIndex = Integer.parseInt(singleKey.split("\\.")[3]);
+				Double value = Double.parseDouble(jedis.get(singleKey));
+				if (!value.isNaN() && (subtaskIndex < parallelism)) {
+					subtaskCpuUsages.add(value);
+				}
 			}
-		}
+			cur = scanResult.getCursor();
+		} while (!cur.equals(SCAN_POINTER_START));
 
-		return rate;
+		jedis.close();
+		return subtaskCpuUsages;
+	}
+
+	public double getOperatorCpuUsage (String operator, int parallelism) {
+		Jedis jedis = jedisPool.getResource();
+		String key = String.format("cpuUsage.%s.%s.*", jobGraph.getName(), operator);
+		ScanParams scanParams = new ScanParams().match(key);
+		String cur = SCAN_POINTER_START;
+		double cpuUsageSum = 0.0;
+		int subTaskCount = 0;
+		do {
+			ScanResult<String> scanResult = jedis.scan(cur, scanParams);
+
+			// work with result
+			for (String singleKey: scanResult.getResult()){
+				int subtaskIndex = Integer.parseInt(singleKey.split("\\.")[3]);
+				Double value = Double.parseDouble(jedis.getSet(singleKey,String.valueOf(0)));
+				if (!value.isNaN() && (subtaskIndex < parallelism)) {
+					cpuUsageSum += value;
+					subTaskCount++;
+				}
+			}
+			cur = scanResult.getCursor();
+		} while (!cur.equals(SCAN_POINTER_START));
+
+		if(subTaskCount == 0) return 0.0;
+		jedis.close();
+		return cpuUsageSum / subTaskCount;
+	}
+
+	public double getOperatorCpuUsage (Operator operator) {
+		Jedis jedis = jedisPool.getResource();
+		String key = String.format("cpuUsage.%s.%s.*", jobGraph.getName(), operator.getName());
+		int parallelism = operator.getInstances().size();
+		ScanParams scanParams = new ScanParams().match(key);
+		String cur = SCAN_POINTER_START;
+		double cpuUsageSum = 0.0;
+		int subTaskCount = 0;
+		do {
+			ScanResult<String> scanResult = jedis.scan(cur, scanParams);
+
+			// work with result
+			for (String singleKey: scanResult.getResult()){
+				//from RedisReporter: cpuUsage.jobId.operator.subtaskId -> subtaskIndex is field[3]
+				int subtaskIndex = Integer.parseInt(singleKey.split("\\.")[3]);
+				Double value = Double.parseDouble(jedis.getSet(singleKey,String.valueOf(0)));
+				if (!value.isNaN() && (subtaskIndex < parallelism)) {
+					cpuUsageSum += value;
+					subTaskCount++;
+				}
+			}
+			cur = scanResult.getCursor();
+		} while (!cur.equals(SCAN_POINTER_START));
+
+		if(subTaskCount == 0) return 0.0;
+		jedis.close();
+		return cpuUsageSum / subTaskCount;
 	}
 
 	public double getAvgOperatorProcessingTime (String operator)
@@ -214,27 +337,34 @@ public class ApplicationMonitor {
 		return executionTimeSum / subTaskCount;
 	}
 
-	public double getAvgOperatorThroughput(JobVertex operator)
+	public double getAvgOperatorProcessingTime (JobVertex vertex)
 	{
-		String operatorId = operator.getName();
-		if (!operator2subtasksThroughput.containsKey(operatorId))
-			return 0.0; /* no measurements available yet */
+		Jedis jedis = jedisPool.getResource();
+		String key = String.format("executionTime.%s.%s.*", jobGraph.getName(), vertex.getName());
+		int parallelism = vertex.getParallelism();
+		ScanParams scanParams = new ScanParams().match(key);
+		String cur = SCAN_POINTER_START;
+		double executionTimeSum = 0.0;
+		int subTaskCount = 0;
+		do {
+			ScanResult<String> scanResult = jedis.scan(cur, scanParams);
 
-		double tot = 0.0;
-		for (Map.Entry<Integer, Double> e : operator2subtasksThroughput.get(operatorId).entrySet()) {
-			Double value = e.getValue();
-			if (Double.isNaN(value)) {
-				continue;
+			// work with result
+			for (String singleKey: scanResult.getResult()){
+				//from RedisReporter: executionTime.jobId.operator.subtaskId -> subtaskIndex is field[3]
+				int subtaskIndex = Integer.parseInt(singleKey.split("\\.")[3]);
+				Double value = Double.parseDouble(jedis.get(singleKey));
+				if (!value.isNaN() && (subtaskIndex < parallelism)) {
+					executionTimeSum += value;
+					subTaskCount++;
+				}
 			}
-			tot += e.getValue();
-		}
+			cur = scanResult.getCursor();
+		} while (!cur.equals(SCAN_POINTER_START));
 
-		return tot;
-	}
-
-	public double getAvgOperatorQueueLength (JobVertex operator)
-	{
-		return getAvgOperatorThroughput(operator)*getAvgOperatorLatency(operator);
+		if(subTaskCount == 0) return 0.0;
+		jedis.close();
+		return executionTimeSum / subTaskCount;
 	}
 
 	public double getAvgApplicationResponseTime ()
@@ -296,45 +426,6 @@ public class ApplicationMonitor {
 		return (operatorLatencySum/numSubtask);
 	}
 
-    /*
-	public double getAvgLatencyUpToOperator (JobVertex operator)
-	{
-		double operatorLatencySum = 0.0;
-		int numSubtask = operator.getParallelism();
-		if (numSubtask == 0) return operatorLatencySum;
-		for (int subtaskId=0; subtaskId<numSubtask; subtaskId++) {
-			String key = String.format("latency.%s.*", jobGraph.getName());
-			ScanParams scanParams = new ScanParams().match(key);
-			String cur = SCAN_POINTER_START;
-			double subtaskLatencySum = 0.0;
-			int numSubtaskLatencies = 0;
-			do {
-				ScanResult<String> scanResult = jedis.scan(cur, scanParams);
-
-				// work with result
-				for (String singleKey : scanResult.getResult()) {
-					//subtaskLatencySum += Double.parseDouble(singleKey);
-					//numSubtaskLatencies++;
-					String pattern = String.format("%s.%s", operator.getID(), subtaskId);
-					//EDFLogger.log("EDF: result è " + singleKey + " e pattern " + pattern, LogLevel.INFO, ApplicationMonitor.class);
-					if (singleKey.contains(pattern)){
-						String value = jedis.get(singleKey);
-						//EDFLogger.log("EDF: " + value, LogLevel.INFO, ApplicationMonitor.class);
-						subtaskLatencySum += Double.parseDouble(value);
-						numSubtaskLatencies++;
-					}
-				}
-				cur = scanResult.getCursor();
-			} while (!cur.equals(SCAN_POINTER_START));
-			EDFLogger.log("EDF: found " + numSubtaskLatencies + " latency entries for subtask number " + subtaskId, LogLevel.INFO, ApplicationMonitor.class);
-			if(numSubtaskLatencies != 0) operatorLatencySum += (subtaskLatencySum / numSubtaskLatencies);
-		}
-		EDFLogger.log("EDF: found " + numSubtask + " subtasks for operator " + operator.getName(), LogLevel.INFO, ApplicationMonitor.class);
-		return (operatorLatencySum/numSubtask);
-
-	}
-
-     */
 
 	public double getAvgOperatorLatency (JobVertex operator) {
 		/* QT(op) = max_subtask(QT(op,subtask)) - max_upstream(latency_up_to(upstream) */
@@ -352,30 +443,6 @@ public class ApplicationMonitor {
 		}
 
 		return max_up_to_me - max_up_to_upstream;
-	}
-
-
-
-	private void logDetailedLatencyInfo()
-	{
-		int pathIndex = 0;
-
-		for (List<JobVertex> path : JobGraphUtils.listSourceSinkPaths(jobGraph)) {
-			JobVertex src = path.get(0);
-			double path_latency = 0.0;
-
-			for (JobVertex op : path) {
-				double r_op = getAvgOperatorLatency(op);
-				path_latency += r_op;
-
-				log.info("Op-{}-latency: {}", op.getName(), r_op);
-			}
-
-			//LOG.info("Latency on path proc = {}, queue = {}", r_proc, r_queue);
-
-			++pathIndex;
-			log.info("Path-{}: {}", pathIndex, path_latency);
-		}
 	}
 
 

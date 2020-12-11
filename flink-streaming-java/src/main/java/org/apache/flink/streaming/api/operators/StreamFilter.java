@@ -21,6 +21,10 @@ import org.apache.flink.annotation.Internal;
 import org.apache.flink.api.common.functions.FilterFunction;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 
+import java.lang.management.ManagementFactory;
+import java.lang.management.ThreadMXBean;
+import java.util.concurrent.TimeUnit;
+
 /**
  * A {@link StreamOperator} for executing {@link FilterFunction FilterFunctions}.
  */
@@ -28,6 +32,9 @@ import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 public class StreamFilter<IN> extends AbstractUdfStreamOperator<IN, FilterFunction<IN>> implements OneInputStreamOperator<IN, IN> {
 
 	private static final long serialVersionUID = 1L;
+	//EDF
+	private long refTime = 0;
+	private long refCpuTime = 0;
 
 	public StreamFilter(FilterFunction<IN> filterFunction) {
 		super(filterFunction);
@@ -47,5 +54,13 @@ public class StreamFilter<IN> extends AbstractUdfStreamOperator<IN, FilterFuncti
 		final long t1 = System.currentTimeMillis();
 		final long executionTimeMillis = t1-t0;
 		executionTimeHistogram.update(executionTimeMillis);
+
+		if ((t1 - TimeUnit.NANOSECONDS.toMillis(refTime)) > 5*1000){
+			long currTime = System.nanoTime();
+			long currCpuTime = ManagementFactory.getThreadMXBean().getCurrentThreadCpuTime();
+			cpuUsage = (double) (currCpuTime - refCpuTime) / (double) (currTime - refTime);
+			refTime = currTime;
+			refCpuTime = currCpuTime;
+		}
 	}
 }
