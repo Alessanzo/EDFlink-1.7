@@ -1,6 +1,8 @@
 package it.uniroma2.edf.am.monitor;
 
+import it.uniroma2.dspsim.ConfigurationKeys;
 import it.uniroma2.dspsim.dsp.Operator;
+import it.uniroma2.dspsim.dsp.edf.om.OMMonitoringInfo;
 import it.uniroma2.edf.EDFLogger;
 import it.uniroma2.edf.EDFUtils;
 import it.uniroma2.edf.JobGraphUtils;
@@ -87,6 +89,40 @@ public class ApplicationMonitor {
 
 	public Jedis getPoolConnection() {
 		return jedisPool.getResource();
+	}
+
+	public OMMonitoringInfo getOperatorIRandUsage(String operatorName, int currentParallelism) {
+		double operatorInputRate = 0;
+		double operatorCpuUsage = 0;
+
+		ArrayList<Double> subtaskInputRates = getSubtaskInputRates(operatorName, currentParallelism);
+		ArrayList<Double> subtaskCpuUsages = getSubtaskCpuUsages(operatorName, currentParallelism);
+		ArrayList<Double> subtaskIRFractions = new ArrayList<>();
+
+		for (double subtaskIR: subtaskInputRates)
+			operatorInputRate+=subtaskIR;
+
+		String mode = it.uniroma2.dspsim.Configuration.getInstance().getString(
+			ConfigurationKeys.OPERATOR_VALUES_COMPUTING_CASE_KEY, "avg");
+
+		if ((operatorInputRate != 0.0) && (mode.equals("avg"))) {
+			for (int i=0; i<currentParallelism;i++) {
+				subtaskIRFractions.add(subtaskInputRates.get(i) / operatorInputRate);
+				operatorCpuUsage += (subtaskIRFractions.get(i) * subtaskCpuUsages.get(i));
+			}
+		}
+		else if (mode.equals("worst")){
+			operatorCpuUsage =  Collections.max(subtaskCpuUsages);
+		}
+		else {
+			for (double subtaskCpuUsage: subtaskCpuUsages)
+				operatorCpuUsage += subtaskCpuUsage;
+			operatorCpuUsage = operatorCpuUsage / currentParallelism;
+		}
+		OMMonitoringInfo monitoringInfo = new OMMonitoringInfo();
+		monitoringInfo.setInputRate(operatorInputRate);
+		monitoringInfo.setCpuUtilization(operatorCpuUsage);
+		return monitoringInfo;
 	}
 
 	//ESCLUDO SORGENTE E SINK DALLE LATENZE SUL PERCORSO
@@ -242,7 +278,7 @@ public class ApplicationMonitor {
 			// work with result
 			for (String singleKey: scanResult.getResult()){
 				int subtaskIndex = Integer.parseInt(singleKey.split("\\.")[3]);
-				Double value = Double.parseDouble(jedis.get(singleKey));
+				Double value = Double.parseDouble(jedis.getSet(singleKey, String.valueOf(0)));
 				if (!value.isNaN() && (subtaskIndex < parallelism)) {
 					subtaskCpuUsages.add(value);
 				}

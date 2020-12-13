@@ -10,6 +10,8 @@ import it.uniroma2.dspsim.dsp.edf.am.ApplicationManager;
 import it.uniroma2.dspsim.dsp.edf.am.ApplicationManagerFactory;
 import it.uniroma2.dspsim.dsp.edf.am.ApplicationManagerType;
 import it.uniroma2.dspsim.dsp.edf.om.OperatorManager;
+import it.uniroma2.dspsim.dsp.edf.om.OperatorManagerType;
+import it.uniroma2.dspsim.dsp.edf.om.factory.OperatorManagerFactory;
 import it.uniroma2.dspsim.dsp.queueing.MG1OperatorQueueModel;
 import it.uniroma2.dspsim.infrastructure.ComputingInfrastructure;
 import it.uniroma2.dspsim.utils.Tuple2;
@@ -53,12 +55,10 @@ public class EDFlink extends EDF {
 			edFlinkOperatorManagers.put(op, edFlinkOM);
 		}
 		//instantiation of the AM passing wrappedOM's
-		//ApplicationManager appManager = newApplicationManager(configuration, jobGraph, dispatcher, sloLatency);
 		ApplicationManager appManager = newApplicationManager(configuration, jobGraph, dispatcher, appMonitor, sloLatency);
 		//AM start
 		new Thread((Runnable) appManager).start();
 
-		//LoggingUtils.configureLogging();
 		//simulation.dumpConfigs();
 		//simulation.dumpStats();
 	}
@@ -67,17 +67,10 @@ public class EDFlink extends EDF {
 		return new EDFlinkOperatorManager(om, appMonitor);
 	}
 
-
-	//TODO TOGLIERE
-	public static void initialize(JobGraph jobGraph) {
-		//TODO spostare all'avvio di flink per leggere la configurazione una volta
+	//invoked in ClusterEntripoint.startCluster()
+	public static void initialize() {
 		Configuration conf = EDFlinkConfiguration.getEDFlinkConfInstance();
 		conf.parseDefaultConfigurationFile();
-		//conf.parseDefaultConfigurationFile();
-		//conf.parseConfigurationFile("/home/alessandro/IdeaProjects/EDFlink-1.7/flink-runtime/src/main/resources/config.properties");
-
-		//LoggingUtils.configureLogging();(?)
-		//TODO spostare all'avvio di flink per leggere il numero di nodi una volta per tutte
 		ComputingInfrastructure.initCustomInfrastructure(
 			new double[]{1.0, 0.7, 1.3, 0.9, 1.7, 0.8, 1.8, 2.0, 1.65, 1.5},
 			conf.getInteger(ConfigurationKeys.NODE_TYPES_NUMBER_KEY, 3));
@@ -89,5 +82,12 @@ public class EDFlink extends EDF {
 		return new EDFlinkApplicationManager(configuration, jobGraph, dispatcher, application, edFlinkOperatorManagers, sloLatency, appMonitor);
 	}
 
+
+	@Override
+	public OperatorManager newOperatorManager(Operator op, Configuration configuration) {
+		String omType = configuration.getString("edf.om.type", "qlearning");
+		OperatorManagerType operatorManagerType = OperatorManagerType.fromString(omType);
+		return EDFlinkOperatorManagerFactory.createOperatorManager(operatorManagerType, op);
+	}
 
 }

@@ -55,6 +55,8 @@ public class EDFlinkApplicationManager extends ApplicationManager implements Run
 	//map of every Vertex associated with the resType list of the Slots in which they are actually scheduled
 	protected HashMap<JobVertexID, ArrayList<Integer>> currentDeployedSlotsResTypes;
 
+	protected Map<Operator, Reconfiguration> reconfRequests;
+
 	protected ApplicationMonitor appMonitor = null;
 	protected GlobalActuator globalActuator;
 	protected Map<String, Integer> request = new HashMap<>();
@@ -75,6 +77,8 @@ public class EDFlinkApplicationManager extends ApplicationManager implements Run
 	private double wSLO;
 	private double wReconf;
 	private double wRes;
+
+	private boolean isReconfigured = false;
 
 	private boolean detailedScalingLog;
 
@@ -176,6 +180,7 @@ public class EDFlinkApplicationManager extends ApplicationManager implements Run
 			if ((round % 2) == 0) {
 				analyze(endToEndLatency); //calculate costs
 				Map<Operator, Reconfiguration> reconfRequests = plan2(); //take requests
+				this.reconfRequests = reconfRequests;
 				reconfRequests.forEach((op,req) -> EDFLogger.log("EDF: PLAN - reconfigurations : "+req.toString(),
 					LogLevel.INFO, EDFlinkApplicationManager.class)); //print requests taken
 				/*
@@ -187,10 +192,21 @@ public class EDFlinkApplicationManager extends ApplicationManager implements Run
 				 */
 				//EDFLogger.log("AM: NOTIFIED", LogLevel.INFO, EDFlinkApplicationManager.class);
 				execute2(reconfRequests);
-				//plan(round);
-				// Map<Operator, Reconfiguration> reconfigurations = plan2();
-				//execute();
-				//execute2(reconfigurations);
+
+				if (isReconfigured) {
+					iterationCost += this.wReconf;
+					statistics.updateReconfigurations(1);
+
+				}
+				statistics.updateAvgCost(iterationCost);
+				int[] globalDeployment = application.computeGlobalDeployment();
+				for (int i = 0; i < globalDeployment.length; i++) {
+					statistics.updateDeployedInstances(i, globalDeployment[i]);
+				}
+			}
+
+			if ((round % 5)==0){
+				statistics.dumpStats();
 			}
 		}
 	}
@@ -349,6 +365,7 @@ public class EDFlinkApplicationManager extends ApplicationManager implements Run
 	protected void execute2(Map<Operator, Reconfiguration> reconfigurations){
 		if (reconfigurations.isEmpty()){
 			EDFLogger.log("EDF: EXECUTE - no reconf, skipping execution", LogLevel.INFO, EDFlinkApplicationManager.class);
+			isReconfigured = false;
 			for (JobVertex vertex: JobGraphUtils.listSortedTopologicallyOperators(jobGraph, true, true)) {
 				Operator op = perOperatorNameManagers.get(vertex.getName()).getOperator();
 				EDFlinkOperatorManagers.get(op).notifyReconfigured();
@@ -363,6 +380,7 @@ public class EDFlinkApplicationManager extends ApplicationManager implements Run
 		waitForTasksDeployment();
 		deployedCounter.set(0);
 		reconfigureOperators2();
+		isReconfigured = true;
 	}
 
 	//spot the differences between scaling requests and actual deployment
@@ -443,6 +461,7 @@ public class EDFlinkApplicationManager extends ApplicationManager implements Run
 			} else {
 				EDFLogger.log("EDF: la riconfigurazione del vertex " + vertex.getName() + " desiderata NON stata applicata", LogLevel.INFO, EDFlinkApplicationManager.class);
 				desReconf = false;
+				misconfigurationStats(vertex);
 			}
 
 			Operator currOperator = perOperatorNameManagers.get(vertex.getName()).getOperator();
@@ -555,6 +574,24 @@ public class EDFlinkApplicationManager extends ApplicationManager implements Run
 				} catch (InterruptedException e) {
 					Thread.currentThread().interrupt();
 					EDFLogger.log("Thread interrupted " + e.getMessage(), LogLevel.ERROR, EDFlinkApplicationManager.class);
+				}
+			}
+		}
+	}
+
+	private void misconfigurationStats(JobVertex vertex){
+		statistics.updateOpMisconf(1);
+		OperatorManager om;
+		//if vertex is OM managed (not source/sink)
+		if ((om = perOperatorNameManagers.get(vertex.getName())) != null) {
+			//if vertex is object of reconfiguration request
+			if (reconfRequests.get(om.getOperator()) != null) {
+				//if vertex reconfiguration is up-scaling
+				if (reconfRequests.get(om.getOperator()).getInstancesToAdd() != null) {
+					//if up-scaled task is misconfigured
+					if (reconfRequests.get(om.getOperator()).getInstancesToAdd()[0].getIndex() !=
+						vertex.getDeployedSlotsResTypes().get(vertex.getParallelism() - 1))
+						statistics.updateNewPlacementMisconf(1);
 				}
 			}
 		}

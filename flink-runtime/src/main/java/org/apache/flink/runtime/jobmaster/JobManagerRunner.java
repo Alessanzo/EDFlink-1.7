@@ -168,7 +168,7 @@ public class JobManagerRunner implements LeaderContender, OnCompletionActions, A
 				rpcService);
 
 
-			EDFlink.initialize(jobGraph);
+			//EDFlink.initialize();
 
 
 			ApplicationMonitor appMonitor = new ApplicationMonitor(jobGraph, configuration);

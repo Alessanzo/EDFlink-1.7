@@ -48,6 +48,7 @@ public class EDFlinkOperatorManager implements Runnable{
 				Thread.sleep(10000);
 			} catch (InterruptedException e) {
 			}
+			/*
 			int currentParallelism = wrappedOM.getOperator().getInstances().size();
 			getIrAndUtilization(wrappedOM.getOperator());
 			double operatorInputRate = appMonitor.getOperatorInputRate(wrappedOM.getOperator().getName(), currentParallelism);
@@ -61,12 +62,18 @@ public class EDFlinkOperatorManager implements Runnable{
 			OMMonitoringInfo monitoringInfo = new OMMonitoringInfo();
 			monitoringInfo.setInputRate(operatorInputRate);
 			monitoringInfo.setCpuUtilization(u);
+			*/
+			OMMonitoringInfo monitoringInfo = getIrAndUtilization(wrappedOM.getOperator());
 			this.reconfRequest = wrappedOM.pickReconfigurationRequest(monitoringInfo);
 			reconf = reconfRequest.getRequestedReconfiguration().toString();
+
 			EDFLogger.log("EDF: EDFLINKOM for Operator "+getWrappedOM().getOperator().getName()+
-					" decided this Reconfiguration Request: "+ reconf
+					" monitored this Input Rate: "+monitoringInfo.getInputRate()+ " and this CPUUsage: "
+					+ monitoringInfo.getCpuUtilization()+ " and decided this Reconfiguration Request: "+ reconf
 				, LogLevel.INFO, EDFlinkOperatorManager.class);
+
 			waitReconfigured();
+
 			EDFLogger.log("EDF: EDFLINKOM waited for reconfiguration", LogLevel.INFO, EDFlinkOperatorManager.class);
 		}
 	}
@@ -88,6 +95,7 @@ public class EDFlinkOperatorManager implements Runnable{
 	public OMMonitoringInfo getIrAndUtilization(Operator operator){
 		String operatorName = operator.getName();
 		int currentParallelism = operator.getInstances().size();
+		/*
 		double operatorInputRate = 0;
 		double operatorCpuUsage = 0;
 
@@ -119,10 +127,8 @@ public class EDFlinkOperatorManager implements Runnable{
 		monitoringInfo.setInputRate(operatorInputRate);
 		monitoringInfo.setCpuUtilization(operatorCpuUsage);
 
-		EDFLogger.log("EDF: EDFLINKOM with new method monitored for Operator"+operatorName+
-			" with current parallelism " + currentParallelism + " this Input Rate: "+operatorInputRate +
-			" and this CPUUsage: "+ operatorCpuUsage, LogLevel.INFO, EDFlinkOperatorManager.class);
-		return monitoringInfo;
+		 */
+		return appMonitor.getOperatorIRandUsage(operatorName, currentParallelism);
 	}
 
 	public OMRequest getReconfRequest() {
