@@ -20,6 +20,7 @@ import it.uniroma2.edf.EDFLogger;
 import it.uniroma2.edf.EDFlinkConfiguration;
 import it.uniroma2.edf.JobGraphUtils;
 import it.uniroma2.edf.am.monitor.ApplicationMonitor;
+import org.apache.flink.configuration.ConfigConstants;
 import org.apache.flink.runtime.dispatcher.Dispatcher;
 import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.jobgraph.JobVertex;
@@ -70,7 +71,9 @@ public class EDFlink extends EDF {
 	//invoked in ClusterEntripoint.startCluster()
 	public static void initialize() {
 		Configuration conf = EDFlinkConfiguration.getEDFlinkConfInstance();
-		conf.parseDefaultConfigurationFile();
+		String filepath = System.getenv(ConfigConstants.ENV_FLINK_CONF_DIR) + "/config.properties";
+		//conf.parseDefaultConfigurationFile();
+		conf.parseConfigurationFile(filepath);
 		ComputingInfrastructure.initCustomInfrastructure(
 			new double[]{1.0, 0.7, 1.3, 0.9, 1.7, 0.8, 1.8, 2.0, 1.65, 1.5},
 			conf.getInteger(ConfigurationKeys.NODE_TYPES_NUMBER_KEY, 3));

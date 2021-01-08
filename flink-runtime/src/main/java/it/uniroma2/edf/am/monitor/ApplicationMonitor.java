@@ -35,6 +35,8 @@ public class ApplicationMonitor {
 	private JedisPool jedisPool = null;
 
 	// must be provided as metrics.reporter.<reporter name>.redishost: ....
+	static private final String CONF_REDIS_HOST2 = "metrics.reporter.redisreporter.redishost";
+	static private final String CONF_REDIS_PORT2 = "metrics.reporter.redisreporter.redisport";
 	static private final String CONF_REDIS_HOST = "redishost";
 	static private final String CONF_REDIS_PORT = "redisport";
 	static private final String CONF_LOG_EVERYTHING = "logeverything";
@@ -56,8 +58,8 @@ public class ApplicationMonitor {
 		for (JobVertex jv : jobGraph.getVertices()) {
 			log.info("id2name: {} -> {}", jv.getID().toString(), jv.getName());
 		}
-		String redisHostname = configuration.getString(CONF_REDIS_HOST, "");
-		int redisPort = configuration.getInteger(CONF_REDIS_PORT, 6379);
+		String redisHostname = configuration.getString(CONF_REDIS_HOST2, "");
+		int redisPort = configuration.getInteger(CONF_REDIS_PORT2, 6379);
 		jedis = new Jedis(redisHostname, redisPort);
 
 		JedisPoolConfig poolConfig = new JedisPoolConfig();
@@ -423,12 +425,14 @@ public class ApplicationMonitor {
 		return app_latency;
 	}
 
+	//calculate Avg Operator Latency only between subTask that received at least one tuple (= latency is not 0)
 	public double getAvgLatencyUpToOperator (JobVertex operator)
 	{
 		//Jedis jedis = getPoolConnection(); //ADD
 		Jedis jedis = this.jedisPool.getResource();
 		double operatorLatencySum = 0.0;
 		int numSubtask = operator.getParallelism();
+		int subtaskThatReceivedAny = 0;
 		HashMap<Integer, Double[]> subtaskLatencies = new HashMap<>();
 		for (int subtaskId=0; subtaskId<= numSubtask; subtaskId++)
 			subtaskLatencies.put(subtaskId, new Double[]{0.0, 0.0});
@@ -448,18 +452,26 @@ public class ApplicationMonitor {
 				//if metric refers to a subtask in the parallelism range (0, parallelism-1)
 				if (metricSubtask < numSubtask) {
 					Double[] subtaskLatencySum = subtaskLatencies.get(Integer.parseInt(fields[3]));
-					//EDFLogger.log("EDF: Latency sum " + subtaskLatencySum, LogLevel.INFO, ApplicationMonitor.class);
-					subtaskLatencySum[0]++;
-					subtaskLatencySum[1] += Double.parseDouble(value);
+					//include this (sub)source-subtask latency value to subtask latency mean only if it is not 0
+					if (subtaskLatencySum[1]!=0.0) {
+						subtaskLatencySum[0]++;
+						subtaskLatencySum[1] += Double.parseDouble(value);
+					}
 				}
 			}
 			cur = scanResult.getCursor();
 		} while (!cur.equals(SCAN_POINTER_START));
 		for (Double[] elem : subtaskLatencies.values()) {
-			if (elem[0]!=0.0) operatorLatencySum += (elem[1] / elem[0]);
+			//include this subtask latency value to operator latency mean only if it is not 0
+			if (elem[0]!=0.0 && elem[1]!=0.0) {
+				operatorLatencySum += (elem[1] / elem[0]);
+				subtaskThatReceivedAny++;
+			}
 		}
-		jedis.close(); //ADD
-		return (operatorLatencySum/numSubtask);
+		jedis.close();
+		if (subtaskThatReceivedAny != 0)
+			return (operatorLatencySum/subtaskThatReceivedAny);
+		else return 0.0;
 	}
 
 

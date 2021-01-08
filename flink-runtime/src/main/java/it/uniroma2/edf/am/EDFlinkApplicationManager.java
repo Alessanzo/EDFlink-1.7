@@ -174,6 +174,8 @@ public class EDFlinkApplicationManager extends ApplicationManager implements Run
 			//round = (round + 1) % roundsBetweenPlanning;
 			round = (round + 1);
 			EDFLogger.log("AM: Round " + round, LogLevel.INFO, EDFlinkApplicationManager.class);
+			EDFLogger.log("TRY PRINT FROM CONF " +
+				Configuration.getInstance().getString("simulation.log.detailedscaling","none"), LogLevel.INFO, EDFlinkApplicationManager.class);
 
 			double endToEndLatency = monitor2();//use AppMonitor
 

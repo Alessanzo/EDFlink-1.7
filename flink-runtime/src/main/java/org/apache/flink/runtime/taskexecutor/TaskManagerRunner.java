@@ -21,10 +21,7 @@ package org.apache.flink.runtime.taskexecutor;
 import it.uniroma2.edf.EDFLogger;
 import it.uniroma2.edf.EDFlinkConfiguration;
 import org.apache.flink.api.common.time.Time;
-import org.apache.flink.configuration.Configuration;
-import org.apache.flink.configuration.ConfigurationUtils;
-import org.apache.flink.configuration.GlobalConfiguration;
-import org.apache.flink.configuration.TaskManagerOptions;
+import org.apache.flink.configuration.*;
 import org.apache.flink.core.fs.FileSystem;
 import org.apache.flink.runtime.akka.AkkaUtils;
 import org.apache.flink.runtime.blob.BlobCacheService;
@@ -366,7 +363,9 @@ public class TaskManagerRunner implements FatalErrorHandler, AutoCloseableAsync 
 
 		//EDF: parsing Policies properties
 		it.uniroma2.dspsim.Configuration conf = EDFlinkConfiguration.getEDFlinkConfInstance();
-		conf.parseDefaultConfigurationFile();
+		String filepath = System.getenv(ConfigConstants.ENV_FLINK_CONF_DIR) + "/config.properties";
+		//conf.parseDefaultConfigurationFile();
+		conf.parseConfigurationFile(filepath);
 
 
 		InetAddress remoteAddress = InetAddress.getByName(rpcService.getAddress());

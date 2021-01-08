@@ -49,6 +49,10 @@ public class Configuration extends ExecutionConfig.GlobalJobParameters
 	public int getResType(){ return resType;}
 	public void setResType(int resType){ this.resType = resType;}
 
+	protected static Configuration instance = null;
+
+
+
 	private static final long serialVersionUID = 1L;
 
 	private static final byte TYPE_STRING = 0;
@@ -67,6 +71,20 @@ public class Configuration extends ExecutionConfig.GlobalJobParameters
 	protected final HashMap<String, Object> confData;
 
 	// --------------------------------------------------------------------------------------------
+
+
+	//EDF
+	public static synchronized Configuration getInstance() {
+		if (instance == null) {
+			instance = new Configuration();
+		}
+
+		return instance;
+	}
+
+	public static void setInstance(Configuration conf) {
+		instance = conf;
+	}
 
 	/**
 	 * Creates a new empty configuration.

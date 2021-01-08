@@ -530,7 +530,8 @@ public abstract class ClusterEntrypoint implements AutoCloseableAsync, FatalErro
 		if (hostname != null) {
 			configuration.setString(JobManagerOptions.ADDRESS, hostname);
 		}
-
+		//EDF
+		Configuration.setInstance(configuration);
 		return configuration;
 	}
 

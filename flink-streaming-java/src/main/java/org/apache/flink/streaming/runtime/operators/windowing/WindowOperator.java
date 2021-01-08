@@ -71,7 +71,9 @@ import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.util.OutputTag;
 
 import java.io.Serializable;
+import java.lang.management.ManagementFactory;
 import java.util.Collection;
+import java.util.concurrent.TimeUnit;
 
 import static org.apache.flink.util.Preconditions.checkArgument;
 import static org.apache.flink.util.Preconditions.checkNotNull;
@@ -102,6 +104,10 @@ public class WindowOperator<K, IN, ACC, OUT, W extends Window>
 	implements OneInputStreamOperator<IN, OUT>, Triggerable<K, W> {
 
 	private static final long serialVersionUID = 1L;
+
+	//EDF
+	private long refTime = 0;
+	private long refCpuTime = 0;
 
 	// ------------------------------------------------------------------------
 	// Configuration values and user functions
@@ -292,6 +298,9 @@ public class WindowOperator<K, IN, ACC, OUT, W extends Window>
 
 	@Override
 	public void processElement(StreamRecord<IN> element) throws Exception {
+		//EDF
+		long t0, t1, executionTimeMillis;
+
 		final Collection<W> elementWindows = windowAssigner.assignWindows(
 			element.getValue(), element.getTimestamp(), windowAssignerContext);
 
@@ -354,8 +363,22 @@ public class WindowOperator<K, IN, ACC, OUT, W extends Window>
 					throw new IllegalStateException("Window " + window + " is not in in-flight window set.");
 				}
 
+				//EDF
+				t0 = System.currentTimeMillis();
 				windowState.setCurrentNamespace(stateWindow);
 				windowState.add(element.getValue());
+				// EDF
+				t1 = System.currentTimeMillis();
+				executionTimeMillis = t1-t0;
+				executionTimeHistogram.update(executionTimeMillis);
+
+				if ((t1 - TimeUnit.NANOSECONDS.toMillis(refTime)) > 5*1000){
+					long currTime = System.nanoTime();
+					long currCpuTime = ManagementFactory.getThreadMXBean().getCurrentThreadCpuTime();
+					cpuUsage = (double) (currCpuTime - refCpuTime) / (double) (currTime - refTime);
+					refTime = currTime;
+					refCpuTime = currCpuTime;
+				}
 
 				triggerContext.key = key;
 				triggerContext.window = actualWindow;
@@ -387,8 +410,22 @@ public class WindowOperator<K, IN, ACC, OUT, W extends Window>
 				}
 				isSkippedElement = false;
 
+				//EDF
+				t0 = System.currentTimeMillis();
 				windowState.setCurrentNamespace(window);
 				windowState.add(element.getValue());
+				// EDF
+				t1 = System.currentTimeMillis();
+				executionTimeMillis = t1-t0;
+				executionTimeHistogram.update(executionTimeMillis);
+
+				if ((t1 - TimeUnit.NANOSECONDS.toMillis(refTime)) > 5*1000){
+					long currTime = System.nanoTime();
+					long currCpuTime = ManagementFactory.getThreadMXBean().getCurrentThreadCpuTime();
+					cpuUsage = (double) (currCpuTime - refCpuTime) / (double) (currTime - refTime);
+					refTime = currTime;
+					refCpuTime = currCpuTime;
+				}
 
 				triggerContext.key = key;
 				triggerContext.window = window;

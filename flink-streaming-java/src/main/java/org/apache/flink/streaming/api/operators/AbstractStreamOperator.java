@@ -160,7 +160,7 @@ public abstract class AbstractStreamOperator<OUT>
 	// EDF
 	protected transient Histogram executionTimeHistogram;
 
-	protected double cpuUsage;
+	protected double cpuUsage = 0.0;
 
 	// ---------------- time handler ------------------
 
