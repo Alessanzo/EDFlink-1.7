@@ -392,7 +392,7 @@ public class ApplicationMonitor {
 				//from RedisReporter: executionTime.jobId.operator.subtaskId -> subtaskIndex is field[3]
 				int subtaskIndex = Integer.parseInt(singleKey.split("\\.")[3]);
 				Double value = Double.parseDouble(jedis.get(singleKey));
-				if (!value.isNaN() && (subtaskIndex < parallelism)) {
+				if (!value.isNaN() && (value != 0.0) && (subtaskIndex < parallelism)) {
 					executionTimeSum += value;
 					subTaskCount++;
 				}

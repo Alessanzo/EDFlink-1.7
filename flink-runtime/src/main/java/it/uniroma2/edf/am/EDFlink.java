@@ -51,7 +51,7 @@ public class EDFlink extends EDF {
 			//instantiation of the original OM
 			OperatorManager om = newOperatorManager(op, conf);
 			//instantiation of the wrappedOM
-			EDFlinkOperatorManager edFlinkOM = newEDFlinkOperatorManager(om, appMonitor);
+			EDFlinkOperatorManager edFlinkOM = newEDFlinkOperatorManager(om, appMonitor, configuration);
 			operatorManagers.put(op, om);
 			edFlinkOperatorManagers.put(op, edFlinkOM);
 		}
@@ -66,6 +66,11 @@ public class EDFlink extends EDF {
 
 	protected EDFlinkOperatorManager newEDFlinkOperatorManager(OperatorManager om, ApplicationMonitor appMonitor) {
 		return new EDFlinkOperatorManager(om, appMonitor);
+	}
+
+	protected EDFlinkOperatorManager newEDFlinkOperatorManager(OperatorManager om, ApplicationMonitor appMonitor,
+															   org.apache.flink.configuration.Configuration configuration) {
+		return new EDFlinkOperatorManager(om, appMonitor, configuration);
 	}
 
 	//invoked in ClusterEntripoint.startCluster()

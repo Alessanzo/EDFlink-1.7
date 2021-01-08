@@ -1,6 +1,5 @@
 package it.uniroma2.edf.am;
 
-import it.uniroma2.dspsim.Configuration;
 import it.uniroma2.dspsim.ConfigurationKeys;
 import it.uniroma2.dspsim.dsp.Operator;
 import it.uniroma2.dspsim.dsp.Reconfiguration;
@@ -14,6 +13,8 @@ import it.uniroma2.dspsim.infrastructure.ComputingInfrastructure;
 import it.uniroma2.dspsim.infrastructure.NodeType;
 import it.uniroma2.edf.EDFLogger;
 import it.uniroma2.edf.am.monitor.ApplicationMonitor;
+import org.apache.flink.configuration.Configuration;
+import org.apache.flink.configuration.EDFOptions;
 import org.apache.flink.shaded.netty4.io.netty.handler.logging.LogLevel;
 
 import java.util.ArrayList;
@@ -26,12 +27,19 @@ public class EDFlinkOperatorManager implements Runnable{
 	protected OperatorManager wrappedOM;
 	protected ApplicationMonitor appMonitor;
 	protected OMRequest reconfRequest = null;
+	protected long omInterval = 10;
 
 	boolean recofigured = false;
 
 	public EDFlinkOperatorManager(OperatorManager operatorManager, ApplicationMonitor appMonitor) {
 		this.wrappedOM = operatorManager;
 		this.appMonitor = appMonitor;
+	}
+
+	public EDFlinkOperatorManager(OperatorManager operatorManager, ApplicationMonitor appMonitor, Configuration configuration) {
+		this.wrappedOM = operatorManager;
+		this.appMonitor = appMonitor;
+		this.omInterval = configuration.getLong(EDFOptions.EDF_OM_INTERVAL_SECS);
 	}
 
 	public EDFlinkOperatorManager(OperatorManager operatorManager) {
@@ -44,8 +52,7 @@ public class EDFlinkOperatorManager implements Runnable{
 		String reconf;
 		while (true) {
 			try {
-				//Thread.sleep(amInterval*1000);
-				Thread.sleep(10000);
+				Thread.sleep(omInterval*1000);
 			} catch (InterruptedException e) {
 			}
 			/*

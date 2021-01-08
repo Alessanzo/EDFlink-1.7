@@ -8,6 +8,9 @@ public class EDFOptions {
 	public static final ConfigOption<Boolean> SLOT_GRANULARITY_RES_TYPE = key("edf.slot.granularity").defaultValue(false);
 	public static final ConfigOption<Integer> TASKMANAGER_RES_TYPE = key("edf.resType").defaultValue(0);
 	public static final ConfigOption<String> SLOT_RES_TYPE = key("edf.slot.resType").defaultValue("0");
+	public static final ConfigOption<Long> EDF_OM_INTERVAL_SECS = key("edf.om.interval").defaultValue(10L);
+	public static final ConfigOption<Integer> AM_INTERVAL_SECS = key("edf.am.interval").defaultValue(10);
+	public static final ConfigOption<Integer> AM_ROUNDS_BEFORE_PLANNING = key("edf.am.roundsbeforeplanning").defaultValue(2);
 
 	/**
 	 * Redis.
@@ -27,8 +30,6 @@ public class EDFOptions {
 	 *  Types: default, mead
 	 */
 	public static final ConfigOption<String> EDF_AM_TYPE = key("edf.am.type").defaultValue("default");
-	public static final ConfigOption<Integer> AM_INTERVAL_SECS = key("edf.am.interval").defaultValue(10);
-	public static final ConfigOption<Integer> AM_ROUNDS_BEFORE_PLANNING = key("edf.am.roundsbeforeplanning").defaultValue(12);
 
 	public static final ConfigOption<String> EDF_AM_STATS_FILENAME = key("edf.am.stats.filename").defaultValue("");
 	public static final ConfigOption<Boolean> EDF_AM_DETAILED_LATENCY_LOGGING = key("edf.am.detailedlatencylogging").defaultValue(false);

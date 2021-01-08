@@ -99,7 +99,8 @@ public class EDFlinkApplicationManager extends ApplicationManager implements Run
 
 		this.amInterval = config.getInteger(EDFOptions.AM_INTERVAL_SECS);
 		this.roundsBetweenPlanning = config.getInteger(EDFOptions.AM_ROUNDS_BEFORE_PLANNING);
-		EDFLogger.log("EDF: ROUNDS-BEFORE-PLANNING: " + roundsBetweenPlanning,
+		EDFLogger.log("EDF: AM Interval: "+ amInterval+", OM Interval: "+
+				config.getLong(EDFOptions.EDF_OM_INTERVAL_SECS)+", Rounds Before Planning: " + roundsBetweenPlanning,
 			LogLevel.INFO, it.uniroma2.edf.am.ApplicationManager.class);
 
 		this.globalActuator = new GlobalActuator();
@@ -146,8 +147,7 @@ public class EDFlinkApplicationManager extends ApplicationManager implements Run
 
 		while (true) {
 			try {
-				//Thread.sleep(amInterval*1000);
-				Thread.sleep(10000);
+				Thread.sleep(amInterval*1000);
 			} catch (InterruptedException e) {
 			}
 
@@ -174,12 +174,10 @@ public class EDFlinkApplicationManager extends ApplicationManager implements Run
 			//round = (round + 1) % roundsBetweenPlanning;
 			round = (round + 1);
 			EDFLogger.log("AM: Round " + round, LogLevel.INFO, EDFlinkApplicationManager.class);
-			EDFLogger.log("TRY PRINT FROM CONF " +
-				Configuration.getInstance().getString("simulation.log.detailedscaling","none"), LogLevel.INFO, EDFlinkApplicationManager.class);
 
 			double endToEndLatency = monitor2();//use AppMonitor
 
-			if ((round % 2) == 0) {
+			if ((round % roundsBetweenPlanning) == 0) {
 				analyze(endToEndLatency); //calculate costs
 				Map<Operator, Reconfiguration> reconfRequests = plan2(); //take requests
 				this.reconfRequests = reconfRequests;
@@ -221,7 +219,6 @@ public class EDFlinkApplicationManager extends ApplicationManager implements Run
 		}
 	}
 
-	//TODO deve prendere le metriche necessarie e passarle ai metodi dell'AppManager che estende
 	protected double monitor() {
 		double endToEndLatency = 0.0;
 		for (JobVertex vertex: jobGraph.getVerticesSortedTopologicallyFromSources()){
