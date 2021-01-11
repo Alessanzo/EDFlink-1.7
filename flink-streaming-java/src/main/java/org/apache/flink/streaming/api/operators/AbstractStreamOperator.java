@@ -28,6 +28,7 @@ import org.apache.flink.api.common.state.StateDescriptor;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.api.java.functions.KeySelector;
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.configuration.EDFOptions;
 import org.apache.flink.configuration.MetricOptions;
 import org.apache.flink.core.fs.CloseableRegistry;
 import org.apache.flink.core.memory.DataOutputViewStreamWrapper;
@@ -159,8 +160,12 @@ public abstract class AbstractStreamOperator<OUT>
 
 	// EDF
 	protected transient Histogram executionTimeHistogram;
-
+	protected long cpuUsageInterval;
+	//if punctual
 	protected double cpuUsage = 0.0;
+	//if average
+	protected double cpuUsageSum = 0.0;
+	protected long cpuUsageNum = 0;
 
 	// ---------------- time handler ------------------
 
@@ -228,12 +233,27 @@ public abstract class AbstractStreamOperator<OUT>
 
 			//EDF
 			this.executionTimeHistogram = metrics.histogram(MetricNames.EXECUTION_TIME, new DescriptiveStatisticsHistogram(128));
-			metrics.gauge(MetricNames.CPU_USAGE, new Gauge<Double>() {
-				@Override
-				public Double getValue() {
-					return cpuUsage;
-				}
-			});
+
+			cpuUsageInterval = config.getConfiguration().getLong(EDFOptions.CPU_USAGE_INTERVAL);
+			if (config.getConfiguration().getString(EDFOptions.CPU_USAGE_MODE).equals("punct")) {
+				metrics.gauge(MetricNames.CPU_USAGE, new Gauge<Double>() {
+					@Override
+					public Double getValue() {
+						return cpuUsage;
+					}
+				});
+			}
+			else {
+				metrics.gauge(MetricNames.CPU_USAGE, new Gauge<Double>() {
+					@Override
+					public Double getValue() {
+						return (cpuUsageSum / cpuUsageNum);
+					}
+				});
+			}
+			EDFLogger.log("EDF - Metrics: CpuUsage mod " + config.getConfiguration().getString(EDFOptions.CPU_USAGE_MODE) +
+				", CpuUsage interval: " + cpuUsageInterval, LogLevel.INFO, AbstractStreamOperator.class);
+
 
 		} catch (Exception e) {
 			LOG.warn("An error occurred while instantiating latency metrics.", e);

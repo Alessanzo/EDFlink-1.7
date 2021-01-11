@@ -372,12 +372,15 @@ public class WindowOperator<K, IN, ACC, OUT, W extends Window>
 				executionTimeMillis = t1-t0;
 				executionTimeHistogram.update(executionTimeMillis);
 
-				if ((t1 - TimeUnit.NANOSECONDS.toMillis(refTime)) > 5*1000){
+				if ((t1 - TimeUnit.NANOSECONDS.toMillis(refTime)) > cpuUsageInterval*1000){
 					long currTime = System.nanoTime();
 					long currCpuTime = ManagementFactory.getThreadMXBean().getCurrentThreadCpuTime();
 					cpuUsage = (double) (currCpuTime - refCpuTime) / (double) (currTime - refTime);
 					refTime = currTime;
 					refCpuTime = currCpuTime;
+
+					cpuUsageSum += cpuUsage;
+					cpuUsageNum++;
 				}
 
 				triggerContext.key = key;
@@ -419,12 +422,15 @@ public class WindowOperator<K, IN, ACC, OUT, W extends Window>
 				executionTimeMillis = t1-t0;
 				executionTimeHistogram.update(executionTimeMillis);
 
-				if ((t1 - TimeUnit.NANOSECONDS.toMillis(refTime)) > 5*1000){
+				if ((t1 - TimeUnit.NANOSECONDS.toMillis(refTime)) > cpuUsageInterval*1000){
 					long currTime = System.nanoTime();
 					long currCpuTime = ManagementFactory.getThreadMXBean().getCurrentThreadCpuTime();
 					cpuUsage = (double) (currCpuTime - refCpuTime) / (double) (currTime - refTime);
 					refTime = currTime;
 					refCpuTime = currCpuTime;
+
+					cpuUsageSum += cpuUsage;
+					cpuUsageNum++;
 				}
 
 				triggerContext.key = key;
