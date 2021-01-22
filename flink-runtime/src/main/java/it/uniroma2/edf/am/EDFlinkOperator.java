@@ -23,8 +23,9 @@ public class EDFlinkOperator extends Operator {
 	public double responseTime(double inputRate) {
 		double operatorLatency = appMonitor.getAvgOperatorLatency(vertex);
 		double procTime = appMonitor.getAvgOperatorProcessingTime(vertex);
-		EDFLogger.log("EDF: metodo overridden invocato. Latenza operatore: "+ (operatorLatency+procTime)
+		double opRespTime = (operatorLatency+procTime) / 1000;
+		EDFLogger.log("EDF: metodo overridden invocato. Latenza operatore: "+ opRespTime
 			+", SLO operatore: "+getSloRespTime(), LogLevel.INFO, EDFlinkOperator.class);
-		return (operatorLatency+procTime);
+		return opRespTime;
 	}
 }

@@ -19,15 +19,20 @@
 package org.apache.flink.runtime.jobgraph;
 
 import it.uniroma2.dspsim.infrastructure.NodeType;
+import it.uniroma2.edf.EDFLogger;
+import it.uniroma2.edf.EDFlinkConfiguration;
+import it.uniroma2.edf.am.EDFlink;
 import org.apache.flink.api.common.ExecutionConfig;
 import org.apache.flink.api.common.InvalidProgramException;
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.cache.DistributedCache;
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.configuration.EDFOptions;
 import org.apache.flink.core.fs.Path;
 import org.apache.flink.runtime.blob.PermanentBlobKey;
 import org.apache.flink.runtime.clusterframework.types.AllocationID;
 import org.apache.flink.runtime.jobgraph.tasks.JobCheckpointingSettings;
+import org.apache.flink.shaded.netty4.io.netty.handler.logging.LogLevel;
 import org.apache.flink.util.InstantiationUtil;
 import org.apache.flink.util.SerializedValue;
 
@@ -129,6 +134,9 @@ public class JobGraph implements Serializable {
 	public JobGraph(JobID jobId, String jobName) {
 		this.jobID = jobId == null ? new JobID() : jobId;
 		this.jobName = jobName == null ? "(unnamed job)" : jobName;
+
+		//EDF
+		EDFlink.initialize();
 
 		try {
 			setExecutionConfig(new ExecutionConfig());
@@ -295,11 +303,15 @@ public class JobGraph implements Serializable {
 	public void addVertex(JobVertex vertex) {
 		final JobVertexID id = vertex.getID();
 		JobVertex previous = taskVertices.put(id, vertex);
-
 		//EDF
-		//this list is filled, an entry for task, with the demanded resType
+		//this list is filled, an entry for task, with the demanded starting resType
+		int startingType = EDFlinkConfiguration.getEDFlinkConfInstance().getInteger("node.types.starting", 1);
+		int nodeTypes = EDFlinkConfiguration.getEDFlinkConfInstance().getInteger("node.types.number", 3);
+		if (startingType >= nodeTypes)
+			startingType = nodeTypes - 1;
 		Integer[] arr = new Integer[vertex.getParallelism()];
-		Arrays.fill(arr, 1);
+		//Arrays.fill(arr, 1);
+		Arrays.fill(arr, startingType);
 		ArrayList<Integer> resList = new ArrayList<>();
 		Collections.addAll(resList, arr);
 		taskResTypes.put(id, resList);

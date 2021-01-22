@@ -26,6 +26,7 @@ import org.apache.flink.streaming.runtime.tasks.ProcessingTimeService;
 import org.apache.flink.util.OutputTag;
 
 import java.lang.management.ManagementFactory;
+import java.util.concurrent.TimeUnit;
 
 import static org.apache.flink.util.Preconditions.checkState;
 
@@ -79,7 +80,7 @@ public class ProcessOperator<IN, OUT>
 		final long executionTimeMillis = t1-t0;
 		executionTimeHistogram.update(executionTimeMillis);
 
-		if ((t1 - refTime) > cpuUsageInterval*1000){
+		if ((t1 - TimeUnit.NANOSECONDS.toMillis(refTime)) > cpuUsageInterval*1000){
 			long currTime = System.nanoTime();
 			long currCpuTime = ManagementFactory.getThreadMXBean().getCurrentThreadCpuTime();
 			cpuUsage = (double) (currCpuTime - refCpuTime) / (double) (currTime - refTime);

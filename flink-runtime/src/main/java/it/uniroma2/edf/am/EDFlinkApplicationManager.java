@@ -178,8 +178,12 @@ public class EDFlinkApplicationManager extends ApplicationManager implements Run
 			double endToEndLatency = monitor2();//use AppMonitor
 
 			if ((round % roundsBetweenPlanning) == 0) {
+				iterationCost = 0.0;
+
 				analyze(endToEndLatency); //calculate costs
+				//FOR EXPERIMENTS
 				Map<Operator, Reconfiguration> reconfRequests = plan2(); //take requests
+				//Map<Operator, Reconfiguration> reconfRequests = new HashMap<>();
 				this.reconfRequests = reconfRequests;
 				reconfRequests.forEach((op,req) -> EDFLogger.log("EDF: PLAN - reconfigurations : "+req.toString(),
 					LogLevel.INFO, EDFlinkApplicationManager.class)); //print requests taken
@@ -199,6 +203,7 @@ public class EDFlinkApplicationManager extends ApplicationManager implements Run
 
 				}
 				statistics.updateAvgCost(iterationCost);
+				statistics.dumpCost(iterationCost);
 				int[] globalDeployment = application.computeGlobalDeployment();
 				for (int i = 0; i < globalDeployment.length; i++) {
 					statistics.updateDeployedInstances(i, globalDeployment[i]);
@@ -275,9 +280,27 @@ public class EDFlinkApplicationManager extends ApplicationManager implements Run
 
 	protected double monitor2() {
 		//Latencies print for experimentation
-		double endToEndLatency = appMonitor.endToEndLatency();
+		double endToEndLatency = appMonitor.endToEndLatency() / 1000;
 		EDFLogger.log("EDF: Simulation-Like EndToEndLatency: " + endToEndLatency,
 			LogLevel.INFO, it.uniroma2.edf.am.ApplicationManager.class);
+
+		String usages = "";
+		String irs = "";
+		String replicas = "";
+
+		for (JobVertex vertex: JobGraphUtils.listSortedTopologicallyOperators(jobGraph, true, true)){
+			int actualPar = vertex.getParallelism();
+			OMMonitoringInfo mon= appMonitor.getOperatorIRandUsage(vertex.getName(),actualPar);
+			usages += mon.getCpuUtilization();
+			usages += ",";
+			irs += mon.getInputRate();
+			irs += ",";
+			replicas += actualPar;
+			replicas += ",";
+		}
+		statistics.dumpUsagesAndIr(usages, irs);
+		statistics.dumpReplicas(replicas);
+
 		return endToEndLatency;
 	}
 
@@ -444,6 +467,7 @@ public class EDFlinkApplicationManager extends ApplicationManager implements Run
 	protected void reconfigureOperators2() {
 		HashMap<JobVertexID, ArrayList<Integer>> overallDesResTypes = jobGraph.getTaskResTypes();
 		boolean desReconf = true;
+
 		//JobGraphUtils.listSortedTopologicallyOperators() if SOURCE AND SINKS INCLUDED
 		for (JobVertex vertex: JobGraphUtils.listSortedTopologicallyOperators(jobGraph, true, true)) {
 			//ResTypes the current Vertex is deployed on
@@ -557,7 +581,7 @@ public class EDFlinkApplicationManager extends ApplicationManager implements Run
 			else if (reconf.getValue().getInstancesToRemove() != null) {
 				for (NodeType nodeTypeToModify: opReconf.getInstancesToRemove()){
 					resTypeToModify = nodeTypeToModify.getIndex();
-					jobGraph.getTaskResTypes().get(operatorID).remove(resTypeToModify);
+					jobGraph.getTaskResTypes().get(operatorID).remove(Integer.valueOf(resTypeToModify));
 					newParallelism --;
 				}
 				request.put(operatorID.toString(), newParallelism);

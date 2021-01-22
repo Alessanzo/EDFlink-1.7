@@ -8,9 +8,7 @@ import it.uniroma2.dspsim.stats.metrics.CountMetric;
 import it.uniroma2.dspsim.stats.metrics.Metric;
 import it.uniroma2.dspsim.stats.metrics.RealValuedMetric;
 
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
+import java.io.*;
 
 public class EDFlinkStatistics extends Statistics {
 
@@ -25,8 +23,12 @@ public class EDFlinkStatistics extends Statistics {
 	final String STAT_INSTANCES_TYPES = "InstanceType";
 
 	final File statsOutput;
+	BufferedWriter irOutput = null;
+	BufferedWriter usagesOutput = null;
+	BufferedWriter costOutput = null;
+	BufferedWriter replicasOutput = null;
 
-	public EDFlinkStatistics(){
+	public EDFlinkStatistics() {
 		super();
 		registerMetrics();
 
@@ -35,7 +37,61 @@ public class EDFlinkStatistics extends Statistics {
 		if (!statsOutput.getParentFile().exists()) {
 			statsOutput.getParentFile().mkdirs();
 		}
+		try {
+			if (Configuration.getInstance().getString(ConfigurationKeys.OM_TYPE_KEY, "").equals("threshold")) {
+				usagesOutput = new BufferedWriter(new FileWriter(String.format("%s/cpu_usages",
+					Configuration.getInstance().getString(ConfigurationKeys.OUTPUT_BASE_PATH_KEY, ""))));
+			}
+			irOutput = new BufferedWriter(new FileWriter(String.format("%s/ir",
+				Configuration.getInstance().getString(ConfigurationKeys.OUTPUT_BASE_PATH_KEY, ""))));
+			costOutput = new BufferedWriter(new FileWriter(String.format("%s/cost",
+				Configuration.getInstance().getString(ConfigurationKeys.OUTPUT_BASE_PATH_KEY, ""))));
+			replicasOutput = new BufferedWriter(new FileWriter(String.format("%s/replicas",
+				Configuration.getInstance().getString(ConfigurationKeys.OUTPUT_BASE_PATH_KEY, ""))));
+		}catch (IOException e){
+			e.printStackTrace();
+		}
 	}
+
+	public void dumpUsagesAndIr(String usages, String ir) {
+		try {
+			if (usagesOutput != null) {
+				usagesOutput.write(usages);
+				usagesOutput.newLine();
+				usagesOutput.flush();
+			}
+			if (irOutput != null) {
+				irOutput.write(ir);
+				irOutput.newLine();
+				irOutput.flush();
+			}
+		}catch (IOException e){
+			e.printStackTrace();
+		}
+	}
+	public void dumpCost(double cost){
+		if (costOutput != null){
+			try {
+				costOutput.write(String.valueOf(cost));
+				costOutput.newLine();
+				costOutput.flush();
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
+	}
+	public void dumpReplicas(String replicas) {
+		try {
+			if (replicasOutput != null) {
+				replicasOutput.write(replicas);
+				replicasOutput.newLine();
+				replicasOutput.flush();
+			}
+		}catch (IOException e){
+			e.printStackTrace();
+		}
+	}
+
 
 	public void dumpStats() {
 		try {

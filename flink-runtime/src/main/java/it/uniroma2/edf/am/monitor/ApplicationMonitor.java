@@ -280,7 +280,8 @@ public class ApplicationMonitor {
 			// work with result
 			for (String singleKey: scanResult.getResult()){
 				int subtaskIndex = Integer.parseInt(singleKey.split("\\.")[3]);
-				Double value = Double.parseDouble(jedis.getSet(singleKey, String.valueOf(0)));
+				//Double value = Double.parseDouble(jedis.getSet(singleKey, String.valueOf(0)));
+				Double value = Double.parseDouble(jedis.get(singleKey));
 				if (!value.isNaN() && (subtaskIndex < parallelism)) {
 					subtaskCpuUsages.add(value);
 				}
@@ -313,9 +314,8 @@ public class ApplicationMonitor {
 			}
 			cur = scanResult.getCursor();
 		} while (!cur.equals(SCAN_POINTER_START));
-
-		if(subTaskCount == 0) return 0.0;
 		jedis.close();
+		if(subTaskCount == 0) return 0.0;
 		return cpuUsageSum / subTaskCount;
 	}
 
@@ -342,9 +342,8 @@ public class ApplicationMonitor {
 			}
 			cur = scanResult.getCursor();
 		} while (!cur.equals(SCAN_POINTER_START));
-
-		if(subTaskCount == 0) return 0.0;
 		jedis.close();
+		if(subTaskCount == 0) return 0.0;
 		return cpuUsageSum / subTaskCount;
 	}
 
@@ -369,9 +368,8 @@ public class ApplicationMonitor {
 			}
 			cur = scanResult.getCursor();
 		} while (!cur.equals(SCAN_POINTER_START));
-
-		if(subTaskCount == 0) return 0.0;
 		jedis.close();
+		if(subTaskCount == 0) return 0.0;
 		return executionTimeSum / subTaskCount;
 	}
 
@@ -399,9 +397,8 @@ public class ApplicationMonitor {
 			}
 			cur = scanResult.getCursor();
 		} while (!cur.equals(SCAN_POINTER_START));
-
-		if(subTaskCount == 0) return 0.0;
 		jedis.close();
+		if(subTaskCount == 0) return 0.0;
 		return executionTimeSum / subTaskCount;
 	}
 

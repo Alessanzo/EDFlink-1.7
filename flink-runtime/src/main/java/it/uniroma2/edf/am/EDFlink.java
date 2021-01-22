@@ -14,12 +14,14 @@ import it.uniroma2.dspsim.dsp.edf.om.OperatorManagerType;
 import it.uniroma2.dspsim.dsp.edf.om.factory.OperatorManagerFactory;
 import it.uniroma2.dspsim.dsp.queueing.MG1OperatorQueueModel;
 import it.uniroma2.dspsim.infrastructure.ComputingInfrastructure;
+import it.uniroma2.dspsim.infrastructure.NodeType;
 import it.uniroma2.dspsim.utils.Tuple2;
 import it.uniroma2.dspsim.utils.matrix.DoubleMatrix;
 import it.uniroma2.edf.EDFLogger;
 import it.uniroma2.edf.EDFlinkConfiguration;
 import it.uniroma2.edf.JobGraphUtils;
 import it.uniroma2.edf.am.monitor.ApplicationMonitor;
+import org.apache.flink.api.common.io.ParseException;
 import org.apache.flink.configuration.ConfigConstants;
 import org.apache.flink.runtime.dispatcher.Dispatcher;
 import org.apache.flink.runtime.jobgraph.JobGraph;
@@ -75,13 +77,31 @@ public class EDFlink extends EDF {
 
 	//invoked in ClusterEntripoint.startCluster()
 	public static void initialize() {
+		//parsing config.properties from Flink Configuration Directory
 		Configuration conf = EDFlinkConfiguration.getEDFlinkConfInstance();
 		String filepath = System.getenv(ConfigConstants.ENV_FLINK_CONF_DIR) + "/config.properties";
-		//conf.parseDefaultConfigurationFile();
 		conf.parseConfigurationFile(filepath);
-		ComputingInfrastructure.initCustomInfrastructure(
-			new double[]{1.0, 0.7, 1.3, 0.9, 1.7, 0.8, 1.8, 2.0, 1.65, 1.5},
-			conf.getInteger(ConfigurationKeys.NODE_TYPES_NUMBER_KEY, 3));
+
+		//getting # of node types and simulation CPU speedups for initializing EDF Infrastructure
+		int nodeTypesNum = conf.getInteger(ConfigurationKeys.NODE_TYPES_NUMBER_KEY, 3);
+		String[] confCpuSpeedups = conf.getString("simulation.cpu.speedups", "0.7,1.0,1.3,0.9,1.7,0.8,1.8,2.0,1.65,1.5").split(",");
+		double[] nodeCpuSpeedups = new double[nodeTypesNum];
+		//speedups specified at least as many as # of res types
+		if (nodeCpuSpeedups.length != 0 && confCpuSpeedups.length >= nodeTypesNum){
+			try {
+				for (int i=0;i<nodeCpuSpeedups.length;i++)
+					nodeCpuSpeedups[i] = Double.parseDouble(confCpuSpeedups[i]);
+			} catch (NumberFormatException e){
+				nodeCpuSpeedups = new double[]{0.7, 1.0, 1.3, 0.9, 1.7, 0.8, 1.8, 2.0, 1.65, 1.5};
+			}
+		}
+		ComputingInfrastructure.initCustomInfrastructure(nodeCpuSpeedups, nodeTypesNum);
+		NodeType[] nodeTypes = ComputingInfrastructure.getInfrastructure().getNodeTypes();
+		Arrays.stream(nodeTypes).forEach(nodeType -> EDFLogger.log("EDF: Node with Type " + nodeType.getIndex()
+			+ ", speedup "+nodeType.getCpuSpeedup() + ", cost "+ nodeType.getCost(), LogLevel.INFO, EDFlink.class));
+		EDFLogger.log("EDF: Starting Restype: "+EDFlinkConfiguration.getEDFlinkConfInstance().getInteger("node.types.starting", 1), LogLevel.INFO,
+			EDFlink.class);
+
 
 	}
 
