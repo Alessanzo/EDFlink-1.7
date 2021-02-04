@@ -100,16 +100,19 @@ public class RedisMetricsReporter implements MetricReporter, Scheduled {
 			for (Map.Entry<Counter, String> metric : counters.entrySet()) {
 				LOG.info("{}: {}", metric.getValue(), metric.getKey().getCount());
 			}
+
 */
-			for (Map.Entry<Gauge<?>, String> metric : gauges.entrySet()) {
+
+		for (Map.Entry<Gauge<?>, String> metric : gauges.entrySet()) {
 				//LOG.info("{}: {}", metric.getValue(), metric.getKey().getValue().toString());
 				final String identifier = metric.getValue();
 				if (identifier.contains(MetricNames.CPU_USAGE)) {
+					EDFLogger.log("CPU USAGEEE", LogLevel.INFO, RedisMetricsReporter.class);
 					LOG.info("{}: {}", metric.getValue(), metric.getKey().getValue().toString());
 					Double cpuUsage = (Double) metric.getKey().getValue();
 					reportCpuUsage(identifier, cpuUsage);
 				}
-			}
+		}
 
 		for (Map.Entry<Meter, String> metric : meters.entrySet()) {
 			if (logEverything) {
@@ -208,9 +211,12 @@ public class RedisMetricsReporter implements MetricReporter, Scheduled {
 		final String operator = fields[4];
 		final String subtaskId = fields[5];
 
+		EDFLogger.log("EDF: execution time " + stats.getMean() + ", operator "+ operator +", subtask "+subtaskId, LogLevel.INFO, RedisMetricsReporter.class);
+
 		if (publishOnRedis) {
 			String key = String.format("executionTime.%s.%s.%s", jobId, operator, subtaskId);
 			jedis.set(key, String.valueOf(stats.getMean()));
+			LOG.info("J={}, operator={}, subtask={}, exec time = {}", jobId, operator, subtaskId, stats.getMean());
 			// TODO getQuantile(0.99) ....
 		} else {
 			LOG.info("J={}, operator={}, subtask={}, input rate = {}", jobId, operator, subtaskId, stats.getMean());
@@ -222,12 +228,15 @@ public class RedisMetricsReporter implements MetricReporter, Scheduled {
 		// Format: <hostname>.taskmanager.<tmid>.<jobid>.latency.source_id.<source_id>.
 		// source_subtask_index.<src_subtask>.operator_id.<operatorid>.operator_subtask_id.<subtaskid>.<metric>
 		String fields[] = metricId.split("\\.");
+
 		/*
 		EDFLogger.log("EDF: metricId " + metricId, LogLevel.INFO, RedisMetricsReporter.class);
 		for (String field: fields){
 			EDFLogger.log("EDF: campo dell latenza :" + field, LogLevel.INFO, RedisMetricsReporter.class);
 		}
-		*/
+
+		 */
+
 
 		final String jobId = fields[3];
 		final String sourceId = fields[6];
@@ -244,6 +253,8 @@ public class RedisMetricsReporter implements MetricReporter, Scheduled {
 			operator = fields[10];
 			subtaskId = fields[12];
 		}
+
+		EDFLogger.log("EDF: latenza " + stats.getMean() + ", operator "+ operator +", subtask"+subtaskId, LogLevel.INFO, RedisMetricsReporter.class);
 
 		if (publishOnRedis) {
 			//String key = String.format("latency.%s.%s.%s.%s.%s", jobId, sourceId, sourceSubtaskId, operator, subtaskId);

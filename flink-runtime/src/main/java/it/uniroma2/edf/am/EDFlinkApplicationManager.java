@@ -195,7 +195,12 @@ public class EDFlinkApplicationManager extends ApplicationManager implements Run
 
 				 */
 				//EDFLogger.log("AM: NOTIFIED", LogLevel.INFO, EDFlinkApplicationManager.class);
-				execute2(reconfRequests);
+				long time = execute2(reconfRequests);
+				/*
+				if (time > amInterval*1000)
+					monitor2();
+
+				 */
 
 				if (isReconfigured) {
 					iterationCost += this.wReconf;
@@ -284,6 +289,7 @@ public class EDFlinkApplicationManager extends ApplicationManager implements Run
 		EDFLogger.log("EDF: Simulation-Like EndToEndLatency: " + endToEndLatency,
 			LogLevel.INFO, it.uniroma2.edf.am.ApplicationManager.class);
 
+
 		String usages = "";
 		String irs = "";
 		String replicas = "";
@@ -300,6 +306,7 @@ public class EDFlinkApplicationManager extends ApplicationManager implements Run
 		}
 		statistics.dumpUsagesAndIr(usages, irs);
 		statistics.dumpReplicas(replicas);
+		statistics.dumpLatency(String.valueOf(endToEndLatency));
 
 		return endToEndLatency;
 	}
@@ -384,7 +391,8 @@ public class EDFlinkApplicationManager extends ApplicationManager implements Run
 		}
 	}
 
-	protected void execute2(Map<Operator, Reconfiguration> reconfigurations){
+	protected long execute2(Map<Operator, Reconfiguration> reconfigurations){
+		long start = System.currentTimeMillis();
 		if (reconfigurations.isEmpty()){
 			EDFLogger.log("EDF: EXECUTE - no reconf, skipping execution", LogLevel.INFO, EDFlinkApplicationManager.class);
 			isReconfigured = false;
@@ -392,7 +400,7 @@ public class EDFlinkApplicationManager extends ApplicationManager implements Run
 				Operator op = perOperatorNameManagers.get(vertex.getName()).getOperator();
 				EDFlinkOperatorManagers.get(op).notifyReconfigured();
 			}
-			return;
+			return (System.currentTimeMillis() - start);
 		}
 		//prepare operator to scale request list, and desired resType list
 		fillDesiredSchedulingReconf(reconfigurations);
@@ -403,6 +411,8 @@ public class EDFlinkApplicationManager extends ApplicationManager implements Run
 		deployedCounter.set(0);
 		reconfigureOperators2();
 		isReconfigured = true;
+
+		return (System.currentTimeMillis() - start);
 	}
 
 	//spot the differences between scaling requests and actual deployment

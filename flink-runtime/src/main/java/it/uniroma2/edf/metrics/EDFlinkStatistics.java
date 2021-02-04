@@ -27,6 +27,7 @@ public class EDFlinkStatistics extends Statistics {
 	BufferedWriter usagesOutput = null;
 	BufferedWriter costOutput = null;
 	BufferedWriter replicasOutput = null;
+	BufferedWriter latenciesOutput = null;
 
 	public EDFlinkStatistics() {
 		super();
@@ -48,6 +49,10 @@ public class EDFlinkStatistics extends Statistics {
 				Configuration.getInstance().getString(ConfigurationKeys.OUTPUT_BASE_PATH_KEY, ""))));
 			replicasOutput = new BufferedWriter(new FileWriter(String.format("%s/replicas",
 				Configuration.getInstance().getString(ConfigurationKeys.OUTPUT_BASE_PATH_KEY, ""))));
+			latenciesOutput = new BufferedWriter(new FileWriter(String.format("%s/latencies",
+				Configuration.getInstance().getString(ConfigurationKeys.OUTPUT_BASE_PATH_KEY, ""))));
+
+
 		}catch (IOException e){
 			e.printStackTrace();
 		}
@@ -91,6 +96,18 @@ public class EDFlinkStatistics extends Statistics {
 			e.printStackTrace();
 		}
 	}
+	public void dumpLatency(String latency) {
+		try {
+			if (latenciesOutput != null) {
+				latenciesOutput.write(latency);
+				latenciesOutput.newLine();
+				latenciesOutput.flush();
+			}
+		}catch (IOException e){
+			e.printStackTrace();
+		}
+	}
+
 
 
 	public void dumpStats() {

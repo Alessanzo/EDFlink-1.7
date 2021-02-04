@@ -431,7 +431,7 @@ public class ApplicationMonitor {
 		int numSubtask = operator.getParallelism();
 		int subtaskThatReceivedAny = 0;
 		HashMap<Integer, Double[]> subtaskLatencies = new HashMap<>();
-		for (int subtaskId=0; subtaskId<= numSubtask; subtaskId++)
+		for (int subtaskId=0; subtaskId< numSubtask; subtaskId++)
 			subtaskLatencies.put(subtaskId, new Double[]{0.0, 0.0});
 
 		String key = String.format("latency.%s.%s.*", jobGraph.getName(), operator.getID());
@@ -442,17 +442,19 @@ public class ApplicationMonitor {
 
 			// work with result
 			for (String singleKey : scanResult.getResult()) {
-				String value = jedis.get(singleKey);
 				String[] fields = singleKey.split("\\.");
 				//EDFLogger.log("EDF: Latency key: "+ singleKey + "Latency value: " + value + " Latency fields: " + fields[3], LogLevel.INFO, ApplicationMonitor.class);
 				int metricSubtask = Integer.parseInt(fields[3]);
 				//if metric refers to a subtask in the parallelism range (0, parallelism-1)
 				if (metricSubtask < numSubtask) {
-					Double[] subtaskLatencySum = subtaskLatencies.get(Integer.parseInt(fields[3]));
+					String value = jedis.get(singleKey);
+					double latency = Double.parseDouble(value);
+					EDFLogger.log("EDF: Latency key: "+ singleKey + "Latency value: " + value + " Subtask: " + fields[3], LogLevel.INFO, ApplicationMonitor.class);
+					Double[] subtaskLatencySum = subtaskLatencies.get(metricSubtask);
 					//include this (sub)source-subtask latency value to subtask latency mean only if it is not 0
-					if (subtaskLatencySum[1]!=0.0) {
+					if (latency != 0.0) {
 						subtaskLatencySum[0]++;
-						subtaskLatencySum[1] += Double.parseDouble(value);
+						subtaskLatencySum[1] += latency;
 					}
 				}
 			}
@@ -480,11 +482,14 @@ public class ApplicationMonitor {
 		double max_up_to_upstream = 0.0;
 		Set<JobVertex> upstreamOperators = JobGraphUtils.listUpstreamOperators(jobGraph, operator);
         for (JobVertex upstream : upstreamOperators) {
+        	EDFLogger.log("EDF: Operator " + operator.getName() + " upstream operator is " + upstream.getName() +
+				" with latency " + getAvgLatencyUpToOperator(upstream), LogLevel.INFO, ApplicationMonitor.class);
         	max_up_to_upstream = max(max_up_to_upstream, getAvgLatencyUpToOperator(upstream));
 		}
 
         if (max_up_to_me < max_up_to_upstream) {
         	log.error("latency up to {} is less than to upstreams! {}, {}", operator, max_up_to_me, max_up_to_upstream);
+        	return 0.0;
 		}
 
 		return max_up_to_me - max_up_to_upstream;

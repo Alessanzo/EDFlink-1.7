@@ -31,7 +31,7 @@ import org.apache.flink.shaded.netty4.io.netty.handler.logging.LogLevel;
 import java.io.*;
 import java.util.*;
 
-public class EDFlink extends EDF {
+public class EDFlink {
 
 	private Application application;
 	private Map<Operator, OperatorManager> operatorManagers;
@@ -39,7 +39,7 @@ public class EDFlink extends EDF {
 
 	public EDFlink(Application application, ApplicationMonitor appMonitor, org.apache.flink.configuration.Configuration configuration
 		, JobGraph jobGraph, Dispatcher dispatcher, double sloLatency) {
-		super(application, sloLatency);
+		//super(application, sloLatency);
 		this.application = application;
 
 		final List<Operator> operators = application.getOperators();
@@ -111,7 +111,7 @@ public class EDFlink extends EDF {
 	}
 
 
-	@Override
+	//@Override
 	public OperatorManager newOperatorManager(Operator op, Configuration configuration) {
 		String omType = configuration.getString("edf.om.type", "qlearning");
 		OperatorManagerType operatorManagerType = OperatorManagerType.fromString(omType);

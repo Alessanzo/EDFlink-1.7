@@ -13,7 +13,7 @@ public class EDFOptions {
 	public static final ConfigOption<Integer> AM_ROUNDS_BEFORE_PLANNING = key("edf.am.roundsbeforeplanning").defaultValue(2);
 
 	public static final ConfigOption<String> CPU_USAGE_MODE = key("edf.cpuusage.mode").defaultValue("punct");
-	public static final ConfigOption<Long> CPU_USAGE_INTERVAL = key("edf.cpuusage.interval").defaultValue(5L);
+	public static final ConfigOption<Long> CPU_USAGE_INTERVAL = key("edf.cpuusage.interval").defaultValue(10L);
 
 	/**
 	 * Redis.
