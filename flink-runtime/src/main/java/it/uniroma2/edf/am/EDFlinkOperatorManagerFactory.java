@@ -24,6 +24,8 @@ public class EDFlinkOperatorManagerFactory {
 				return new DeepVLearningOM(operator);
 			case VALUE_ITERATION:
 				return new ValueIterationOM(operator);
+			case MODEL_BASED:
+				return new ModelBasedRLOM(operator);
 			case VALUE_ITERATION_SPLITQ:
 				return new ValueIterationSplitQOM(operator);
 			case FA_TRAJECTORY_BASED_VALUE_ITERATION:

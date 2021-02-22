@@ -10,6 +10,7 @@ import it.uniroma2.edf.EDFLogger;
 import it.uniroma2.edf.EDFlinkConfiguration;
 import it.uniroma2.edf.JobGraphUtils;
 import it.uniroma2.edf.am.monitor.ApplicationMonitor;
+import it.uniroma2.edf.am.monitor.ApplicationMonitorProva;
 import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.jobgraph.JobVertex;
 import org.apache.flink.shaded.netty4.io.netty.handler.logging.LogLevel;
@@ -21,7 +22,7 @@ import java.util.Set;
 
 public class EDFlinkAppBuilder extends ApplicationBuilder {
 
-	static public Application buildApplication(JobGraph jobGraph, ApplicationMonitor appMonitor){
+	static public Application buildApplication(JobGraph jobGraph, ApplicationMonitorProva appMonitor){
 		Application app = new Application();
 		double muScalingFactor = 1.0;
 		HashMap<String, Operator> names2operators = new HashMap<>();
@@ -59,8 +60,10 @@ public class EDFlinkAppBuilder extends ApplicationBuilder {
 		int ops = 0;
 		for (JobVertex operator: JobGraphUtils.listSortedTopologicallyOperators(jobGraph, true, true)){
 
-			Operator appOp = new EDFlinkOperator(appMonitor, operator, operator.getName(),
-				new MG1OperatorQueueModel(serviceStats[ops], serviceStats[ops+1]), maxParallelism);
+			//Operator appOp = new EDFlinkOperator(appMonitor, operator, operator.getName(),
+			//	new MG1OperatorQueueModel(serviceStats[ops], serviceStats[ops+1]), maxParallelism);
+			Operator appOp = new EDFlinkOperator(operator, operator.getName(),
+					new MG1OperatorQueueModel(serviceStats[ops], serviceStats[ops+1]), maxParallelism);
 			EDFLogger.log("EDF: Operator "+ operator.getName() +" with service time mean "+ serviceStats[ops]+
 				" and variance "+serviceStats[ops+1], LogLevel.INFO, EDFlinkAppBuilder.class);
 			ops = ops +2;

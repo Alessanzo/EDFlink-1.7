@@ -287,8 +287,8 @@ under the License.
 
 
 		<dependency>
-			<groupId>com.EDF.uniroma2</groupId>
-			<artifactId>policies-EDF</artifactId>
+			<groupId>com.uniroma2.EDF-final</groupId>
+			<artifactId>policies-EDF-final</artifactId>
 			<version>1.0</version>
 			<exclusions>
 				<exclusion>

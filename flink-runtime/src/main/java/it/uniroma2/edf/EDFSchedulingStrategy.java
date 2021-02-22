@@ -119,9 +119,9 @@ public class EDFSchedulingStrategy implements SchedulingStrategy {
 
 				if(slotContext.getTaskManagerLocation().getResType() >= slotProfile.getResourceProfile().getResourceType()){
 					if(slotContext.getTaskManagerLocation().getResType() == slotProfile.getResourceProfile().getResourceType()) {
-						currentCandidateScore = 100000;
+						currentCandidateScore = 100;
 					}
-					else currentCandidateScore = 50000;
+					else currentCandidateScore = 50;
 				}
 				for (TaskManagerLocation location: slotProfile.getPreferredLocations()) {
 					if (slotContext.getTaskManagerLocation().getResourceID() == location.getResourceID())
@@ -136,8 +136,8 @@ public class EDFSchedulingStrategy implements SchedulingStrategy {
 
 		// at the end of the iteration, we return the candidate with best possible locality or null.
 		if (bestCandidate != null) {
-			if (currentCandidateScore >= 100000) EDFLogger.log("EDF: Lo Slot scelto dallo Scheduler matcha!", LogLevel.INFO, EDFSchedulingStrategy.class);
-			else if (currentCandidateScore >= 50000) EDFLogger.log("EDF: Lo Slot scelto dallo Scheduler non matcha, ma ha un tipo maggiore", LogLevel.INFO, EDFSchedulingStrategy.class);
+			if (currentCandidateScore >= 100) EDFLogger.log("EDF: Lo Slot scelto dallo Scheduler matcha!", LogLevel.INFO, EDFSchedulingStrategy.class);
+			else if (currentCandidateScore >= 50) EDFLogger.log("EDF: Lo Slot scelto dallo Scheduler non matcha, ma ha un tipo maggiore", LogLevel.INFO, EDFSchedulingStrategy.class);
 			else EDFLogger.log("EDF: Lo Slot scelto dallo Scheduler non matcha", LogLevel.INFO, EDFSchedulingStrategy.class);
 			return resultProducer.apply(bestCandidate, Locality.LOCAL);
 		} else {

@@ -541,26 +541,6 @@ public class SlotManager implements AutoCloseable {
 					bestCandidate = taskManagerSlot;
 				}
 			}
-
-
-
-			/*
-			if (taskManagerSlot.getResourceProfile().isMatching(requestResourceProfile) &&
-				(taskManagerSlot.getResourceProfile().getResourceType() == 1)) {
-				iterator.remove();
-				return taskManagerSlot;
-			}
-			*/
-
-			/*
-			if (taskManagerSlot.getResourceProfile().isMatching(requestResourceProfile) &&
-				(taskManagerSlot.getResourceProfile().getResourceType() == requestResourceProfile.getResourceType())) {
-				iterator.remove();
-				return taskManagerSlot;
-			}
-
-
-			 */
 		}
 
 		if (bestCandidate == null) EDFLogger.log("EDF: NON CI SONO SLOT DISPONIBILI NEL RM", LogLevel.INFO, SlotManager.class);
@@ -573,9 +553,6 @@ public class SlotManager implements AutoCloseable {
 			freeSlots.remove(bestCandidate.getSlotId());
 		}
 		return bestCandidate;
-
-		//EDFLogger.log("EDF: Nessun Candidato nello Slot Manager è stato scelto perché nessuno matcha", LogLevel.INFO, SlotManager.class);
-		//return null;
 	}
 
 	//EDF
