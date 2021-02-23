@@ -3,34 +3,22 @@ package it.uniroma2.edf.am;
 import it.uniroma2.dspsim.Configuration;
 import it.uniroma2.dspsim.ConfigurationKeys;
 import it.uniroma2.dspsim.dsp.Application;
-import it.uniroma2.dspsim.dsp.ApplicationBuilder;
 import it.uniroma2.dspsim.dsp.Operator;
-import it.uniroma2.dspsim.dsp.edf.EDF;
 import it.uniroma2.dspsim.dsp.edf.am.ApplicationManager;
-import it.uniroma2.dspsim.dsp.edf.am.ApplicationManagerFactory;
-import it.uniroma2.dspsim.dsp.edf.am.ApplicationManagerType;
 import it.uniroma2.dspsim.dsp.edf.om.OperatorManager;
 import it.uniroma2.dspsim.dsp.edf.om.OperatorManagerType;
-import it.uniroma2.dspsim.dsp.edf.om.factory.OperatorManagerFactory;
-import it.uniroma2.dspsim.dsp.queueing.MG1OperatorQueueModel;
 import it.uniroma2.dspsim.infrastructure.ComputingInfrastructure;
 import it.uniroma2.dspsim.infrastructure.NodeType;
-import it.uniroma2.dspsim.utils.Tuple2;
-import it.uniroma2.dspsim.utils.matrix.DoubleMatrix;
 import it.uniroma2.edf.EDFLogger;
 import it.uniroma2.edf.EDFlinkConfiguration;
-import it.uniroma2.edf.JobGraphUtils;
+import it.uniroma2.edf.am.monitor.ApplicationMonitorOld;
 import it.uniroma2.edf.am.monitor.ApplicationMonitor;
-import it.uniroma2.edf.am.monitor.ApplicationMonitorProva;
-import it.uniroma2.edf.am.monitor.OperatorMonitorProva;
-import org.apache.flink.api.common.io.ParseException;
+import it.uniroma2.edf.am.monitor.OperatorMonitor;
 import org.apache.flink.configuration.ConfigConstants;
 import org.apache.flink.runtime.dispatcher.Dispatcher;
 import org.apache.flink.runtime.jobgraph.JobGraph;
-import org.apache.flink.runtime.jobgraph.JobVertex;
 import org.apache.flink.shaded.netty4.io.netty.handler.logging.LogLevel;
 
-import java.io.*;
 import java.util.*;
 
 public class EDFlink {
@@ -39,9 +27,8 @@ public class EDFlink {
 	private Map<Operator, OperatorManager> operatorManagers;
 	private HashMap<Operator, EDFlinkOperatorManager> edFlinkOperatorManagers;
 
-	public EDFlink(Application application, ApplicationMonitorProva appMonitor, org.apache.flink.configuration.Configuration configuration
+	public EDFlink(Application application, org.apache.flink.configuration.Configuration configuration
 		, JobGraph jobGraph, Dispatcher dispatcher, double sloLatency) {
-		//super(application, sloLatency);
 		this.application = application;
 
 		final List<Operator> operators = application.getOperators();
@@ -52,35 +39,27 @@ public class EDFlink {
 		operatorManagers = new HashMap<>(numOperators);
 		edFlinkOperatorManagers = new HashMap<>(numOperators);
 		for (Operator op : operators) {
-			OperatorMonitorProva opMonitor = new OperatorMonitorProva(jobGraph, configuration);
+			OperatorMonitor opMonitor = new OperatorMonitor(jobGraph, configuration);
 			((EDFlinkOperator) op).setOpMonitor(opMonitor);
 			//instantiation of the original OM
 			OperatorManager om = newOperatorManager(op, conf);
 			//instantiation of the wrappedOM
-			//EDFlinkOperatorManager edFlinkOM = newEDFlinkOperatorManager(om, appMonitor, configuration);
 			EDFlinkOperatorManager edFlinkOM = newEDFlinkOperatorManager(om, opMonitor, configuration);
 			operatorManagers.put(op, om);
 			edFlinkOperatorManagers.put(op, edFlinkOM);
 		}
 		//instantiation of the AM passing wrappedOM's
-		ApplicationManager appManager = newApplicationManager(configuration, jobGraph, dispatcher, appMonitor, sloLatency);
+		ApplicationManager appManager = newApplicationManager(configuration, jobGraph, dispatcher, sloLatency);
 		//AM start
 		new Thread((Runnable) appManager).start();
-
-		//simulation.dumpConfigs();
-		//simulation.dumpStats();
 	}
 
-	protected EDFlinkOperatorManager newEDFlinkOperatorManager(OperatorManager om, ApplicationMonitor appMonitor) {
-		return new EDFlinkOperatorManager(om, appMonitor);
-	}
-
-	protected EDFlinkOperatorManager newEDFlinkOperatorManager(OperatorManager om, ApplicationMonitor appMonitor,
+	protected EDFlinkOperatorManager newEDFlinkOperatorManager(OperatorManager om, ApplicationMonitorOld appMonitor,
 															   org.apache.flink.configuration.Configuration configuration) {
 		return new EDFlinkOperatorManager(om, appMonitor, configuration);
 	}
 
-	protected EDFlinkOperatorManager newEDFlinkOperatorManager(OperatorManager om, OperatorMonitorProva opMonitor,
+	protected EDFlinkOperatorManager newEDFlinkOperatorManager(OperatorManager om, OperatorMonitor opMonitor,
 															   org.apache.flink.configuration.Configuration configuration) {
 		return new EDFlinkOperatorManager(om, opMonitor, configuration);
 	}
@@ -114,16 +93,10 @@ public class EDFlink {
 
 
 	}
-	/*
-	public ApplicationManager newApplicationManager(org.apache.flink.configuration.Configuration configuration
-		, JobGraph jobGraph, Dispatcher dispatcher, ApplicationMonitor appMonitor, double sloLatency) {
-		return new EDFlinkApplicationManager(configuration, jobGraph, dispatcher, application, edFlinkOperatorManagers, sloLatency, appMonitor);
-	}
-	 */
 
 	public ApplicationManager newApplicationManager(org.apache.flink.configuration.Configuration configuration
-		, JobGraph jobGraph, Dispatcher dispatcher, ApplicationMonitorProva appMonitor, double sloLatency) {
-		return new EDFlinkApplicationManager(configuration, jobGraph, dispatcher, application, edFlinkOperatorManagers, sloLatency, appMonitor);
+		, JobGraph jobGraph, Dispatcher dispatcher, double sloLatency) {
+		return new EDFlinkApplicationManager(configuration, jobGraph, dispatcher, application, edFlinkOperatorManagers, sloLatency);
 	}
 
 

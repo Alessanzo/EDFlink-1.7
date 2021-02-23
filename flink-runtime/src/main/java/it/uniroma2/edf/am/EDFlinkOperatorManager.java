@@ -1,50 +1,43 @@
 package it.uniroma2.edf.am;
 
-import it.uniroma2.dspsim.ConfigurationKeys;
 import it.uniroma2.dspsim.dsp.Operator;
 import it.uniroma2.dspsim.dsp.Reconfiguration;
 import it.uniroma2.dspsim.dsp.edf.om.OMMonitoringInfo;
 import it.uniroma2.dspsim.dsp.edf.om.OperatorManager;
 import it.uniroma2.dspsim.dsp.edf.om.request.OMRequest;
 import it.uniroma2.dspsim.dsp.edf.om.request.QBasedReconfigurationScore;
-import it.uniroma2.dspsim.dsp.edf.om.request.ReconfigurationScore;
 import it.uniroma2.dspsim.dsp.edf.om.request.RewardBasedOMRequest;
 import it.uniroma2.dspsim.infrastructure.ComputingInfrastructure;
 import it.uniroma2.dspsim.infrastructure.NodeType;
 import it.uniroma2.edf.EDFLogger;
-import it.uniroma2.edf.am.monitor.ApplicationMonitor;
-import it.uniroma2.edf.am.monitor.OperatorMonitorProva;
+import it.uniroma2.edf.am.monitor.ApplicationMonitorOld;
+import it.uniroma2.edf.am.monitor.OperatorMonitor;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.EDFOptions;
 import org.apache.flink.shaded.netty4.io.netty.handler.logging.LogLevel;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.OptionalDouble;
-
 public class EDFlinkOperatorManager implements Runnable{
 
 	protected OperatorManager wrappedOM;
-	protected ApplicationMonitor appMonitor;
-	protected OperatorMonitorProva opMonitor;
+	protected ApplicationMonitorOld appMonitor;
+	protected OperatorMonitor opMonitor;
 	protected OMRequest reconfRequest = null;
 	protected long omInterval = 10;
 
 	boolean recofigured = false;
 
-	public EDFlinkOperatorManager(OperatorManager operatorManager, ApplicationMonitor appMonitor) {
+	public EDFlinkOperatorManager(OperatorManager operatorManager, ApplicationMonitorOld appMonitor) {
 		this.wrappedOM = operatorManager;
 		this.appMonitor = appMonitor;
 	}
 
-	public EDFlinkOperatorManager(OperatorManager operatorManager, ApplicationMonitor appMonitor, Configuration configuration) {
+	public EDFlinkOperatorManager(OperatorManager operatorManager, ApplicationMonitorOld appMonitor, Configuration configuration) {
 		this.wrappedOM = operatorManager;
 		this.appMonitor = appMonitor;
 		this.omInterval = configuration.getLong(EDFOptions.EDF_OM_INTERVAL_SECS);
 	}
 
-	public EDFlinkOperatorManager(OperatorManager operatorManager, OperatorMonitorProva opMonitor, Configuration configuration) {
+	public EDFlinkOperatorManager(OperatorManager operatorManager, OperatorMonitor opMonitor, Configuration configuration) {
 		this.wrappedOM = operatorManager;
 		this.opMonitor = opMonitor;
 		this.omInterval = configuration.getLong(EDFOptions.EDF_OM_INTERVAL_SECS);

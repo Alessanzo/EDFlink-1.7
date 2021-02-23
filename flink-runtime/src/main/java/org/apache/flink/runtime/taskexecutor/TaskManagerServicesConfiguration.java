@@ -20,7 +20,6 @@ package org.apache.flink.runtime.taskexecutor;
 
 import it.uniroma2.dspsim.ConfigurationKeys;
 import it.uniroma2.edf.EDFLogger;
-import it.uniroma2.edf.EDFUtils;
 import org.apache.flink.api.common.time.Time;
 import org.apache.flink.configuration.*;
 import org.apache.flink.core.memory.MemoryType;
@@ -36,10 +35,7 @@ import org.apache.flink.util.NetUtils;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import scala.Array;
-import scala.Predef;
 
-import java.io.FileInputStream;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.util.*;
@@ -219,19 +215,11 @@ public class TaskManagerServicesConfiguration {
 			InetAddress remoteAddress,
 			boolean localCommunication) throws Exception {
 
-		//EDF
-		String name = EDFUtils.createRandomName();
-		EDFLogger.log("EDF TaskManager Name: " + name, LogLevel.INFO, TaskManagerServicesConfiguration.class);
-
-		//SE PASSO LA RISORSA PER OGNI SLOT DALL'ATTRIBUTO
-		//String key = String.format("%s.slotTypes",name);
-		//String value = taskManagerSlotTypes.get(key);
-		//String[] slotTypes = value.split(",");
 
 
-		//USANDO EDFOPTIONS
 		String[] slotTypes;
 		if (!configuration.getBoolean(EDFOptions.SLOT_GRANULARITY_RES_TYPE)){
+			/*Each Slot inherits its TaskManager resType*/
 			int globalResType = configuration.getInteger(EDFOptions.TASKMANAGER_RES_TYPE);
 			//check of the Taskmanager resType passed, must be in range specified in properties
 			if (it.uniroma2.dspsim.Configuration.getInstance().
@@ -240,7 +228,7 @@ public class TaskManagerServicesConfiguration {
 
 			slotTypes = new String[]{String.valueOf(globalResType)};
 		}
-		//Slot Granularity ResType is not supported by EDFlink MAPE Cycle
+		//Slot Granularity ResType is not supported by EDFlink MAPE Cycle (works with scheduling)
 		else{
 			EDFLogger.log("EDF: WARNING - EDFLINK MAPE DOESN'T SUPPORT SLOT GRANULARITY," +
 					" ONLY WORKS WITH TASKMANAGER GRANULARITY RESTYPES",

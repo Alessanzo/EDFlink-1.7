@@ -21,12 +21,9 @@ package org.apache.flink.runtime.jobmaster;
 import it.uniroma2.dspsim.ConfigurationKeys;
 import it.uniroma2.dspsim.dsp.Application;
 import it.uniroma2.edf.EDFLogger;
-import it.uniroma2.edf.am.ApplicationManager;
-import it.uniroma2.edf.am.ApplicationManagerFactory;
 import it.uniroma2.edf.am.EDFlink;
 import it.uniroma2.edf.am.EDFlinkAppBuilder;
 import it.uniroma2.edf.am.monitor.ApplicationMonitor;
-import it.uniroma2.edf.am.monitor.ApplicationMonitorProva;
 import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.api.common.time.Time;
 import org.apache.flink.configuration.Configuration;
@@ -172,13 +169,12 @@ public class JobManagerRunner implements LeaderContender, OnCompletionActions, A
 			//EDFlink.initialize();
 
 
-			//ApplicationMonitor appMonitor = new ApplicationMonitor(jobGraph, configuration);
-			ApplicationMonitorProva appMonitor = new ApplicationMonitorProva(jobGraph, configuration);
-			Application application = EDFlinkAppBuilder.buildApplication(jobGraph, appMonitor);
+
+			Application application = EDFlinkAppBuilder.buildApplication(jobGraph);
 			it.uniroma2.dspsim.Configuration conf = it.uniroma2.dspsim.Configuration.getInstance();
 			double latencySLO = conf.getDouble(ConfigurationKeys.SLO_LATENCY_KEY, 0.100);
 			EDFLogger.log("EDF: latencySLO: "+latencySLO, LogLevel.INFO, JobManagerRunner.class);
-			EDFlink edFlink= new EDFlink(application, appMonitor, configuration, jobGraph, dispatcher, latencySLO);
+			EDFlink edFlink= new EDFlink(application, configuration, jobGraph, dispatcher, latencySLO);
 
 
 			// EDF: launch the ApplicationManager

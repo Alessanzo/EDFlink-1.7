@@ -4,16 +4,14 @@ package it.uniroma2.edf.am;
 import it.uniroma2.edf.EDFLogger;
 import it.uniroma2.edf.JobGraphUtils;
 import it.uniroma2.edf.am.execute.GlobalActuator;
-import it.uniroma2.edf.am.monitor.ApplicationMonitor;
+import it.uniroma2.edf.am.monitor.ApplicationMonitorOld;
 import org.apache.flink.api.common.time.Time;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.EDFOptions;
-import org.apache.flink.runtime.clusterframework.types.AllocationID;
 import org.apache.flink.runtime.dispatcher.Dispatcher;
 import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.jobgraph.JobStatus;
 import org.apache.flink.runtime.jobgraph.JobVertex;
-import org.apache.flink.runtime.jobgraph.JobVertexID;
 import org.apache.flink.shaded.netty4.io.netty.handler.logging.LogLevel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,7 +33,7 @@ public class ApplicationManager implements Runnable {
 	protected Dispatcher dispatcher;
 	protected Configuration config;
 
-	protected ApplicationMonitor appMonitor = null;
+	protected ApplicationMonitorOld appMonitor = null;
 	protected GlobalActuator globalActuator;
 
 	protected double ir;

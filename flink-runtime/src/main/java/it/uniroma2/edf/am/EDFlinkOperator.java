@@ -3,18 +3,18 @@ package it.uniroma2.edf.am;
 import it.uniroma2.dspsim.dsp.Operator;
 import it.uniroma2.dspsim.dsp.queueing.OperatorQueueModel;
 import it.uniroma2.edf.EDFLogger;
-import it.uniroma2.edf.am.monitor.ApplicationMonitor;
-import it.uniroma2.edf.am.monitor.OperatorMonitorProva;
+import it.uniroma2.edf.am.monitor.ApplicationMonitorOld;
+import it.uniroma2.edf.am.monitor.OperatorMonitor;
 import org.apache.flink.runtime.jobgraph.JobVertex;
 import org.apache.flink.shaded.netty4.io.netty.handler.logging.LogLevel;
 
 public class EDFlinkOperator extends Operator {
 
-	protected ApplicationMonitor appMonitor;
-	protected OperatorMonitorProva opMonitor;
+	protected ApplicationMonitorOld appMonitor;
+	protected OperatorMonitor opMonitor;
 	protected JobVertex vertex;
 
-	public EDFlinkOperator(ApplicationMonitor appMonitor, JobVertex jobVertex, String name,
+	public EDFlinkOperator(ApplicationMonitorOld appMonitor, JobVertex jobVertex, String name,
 						   OperatorQueueModel queueModel, int maxParallelism) {
 		super(name, queueModel, maxParallelism);
 		this.appMonitor = appMonitor;
@@ -27,7 +27,7 @@ public class EDFlinkOperator extends Operator {
 		this.vertex = jobVertex;
 	}
 
-	public void setOpMonitor(OperatorMonitorProva opMonitor){
+	public void setOpMonitor(OperatorMonitor opMonitor){
 		this.opMonitor = opMonitor;
 	}
 

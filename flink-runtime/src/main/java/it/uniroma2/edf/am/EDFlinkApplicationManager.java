@@ -1,28 +1,20 @@
 package it.uniroma2.edf.am;
 
-import it.unimi.dsi.fastutil.Hash;
 import it.uniroma2.dspsim.ConfigurationKeys;
-import it.uniroma2.dspsim.InputRateFileReader;
 import it.uniroma2.dspsim.Simulation;
 import it.uniroma2.dspsim.dsp.Application;
 import it.uniroma2.dspsim.dsp.Operator;
 import it.uniroma2.dspsim.dsp.Reconfiguration;
-import it.uniroma2.dspsim.dsp.edf.MonitoringInfo;
 import it.uniroma2.dspsim.dsp.edf.am.ApplicationManager;
 import it.uniroma2.dspsim.dsp.edf.om.OMMonitoringInfo;
 import it.uniroma2.dspsim.dsp.edf.om.OperatorManager;
 import it.uniroma2.dspsim.dsp.edf.om.request.OMRequest;
 import it.uniroma2.dspsim.infrastructure.ComputingInfrastructure;
 import it.uniroma2.dspsim.infrastructure.NodeType;
-import it.uniroma2.dspsim.stats.Statistics;
-import it.uniroma2.dspsim.stats.metrics.CountMetric;
-import it.uniroma2.dspsim.stats.metrics.Metric;
-import it.uniroma2.dspsim.stats.metrics.RealValuedMetric;
 import it.uniroma2.edf.EDFLogger;
 import it.uniroma2.edf.JobGraphUtils;
 import it.uniroma2.edf.am.execute.GlobalActuator;
 import it.uniroma2.edf.am.monitor.ApplicationMonitor;
-import it.uniroma2.edf.am.monitor.ApplicationMonitorProva;
 import it.uniroma2.edf.am.plan.ReconfigurationManager;
 import it.uniroma2.edf.metrics.EDFlinkStatistics;
 import org.apache.commons.collections.CollectionUtils;
@@ -38,7 +30,6 @@ import org.apache.flink.shaded.netty4.io.netty.handler.logging.LogLevel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -59,7 +50,7 @@ public class EDFlinkApplicationManager extends ApplicationManager implements Run
 
 	protected Map<Operator, Reconfiguration> reconfRequests;
 
-	protected ApplicationMonitorProva appMonitor = null;
+	protected ApplicationMonitor appMonitor = null;
 	protected GlobalActuator globalActuator;
 	protected ReconfigurationManager reconfManager;
 	protected Map<String, Integer> request = new HashMap<>();
@@ -88,20 +79,22 @@ public class EDFlinkApplicationManager extends ApplicationManager implements Run
 
 	public EDFlinkApplicationManager(Configuration configuration, JobGraph jobGraph, Dispatcher dispatcher,
 									 Application application, Map<Operator, EDFlinkOperatorManager> operatorManagers,
-									 double sloLatency, ApplicationMonitorProva appMonitor) {
+									 double sloLatency) {
 		super(application, sloLatency);
+
 		config = configuration;
 		this.jobGraph = jobGraph;
 		this.dispatcher = dispatcher;
 		this.EDFlinkOperatorManagers = operatorManagers;
-		this.appMonitor = appMonitor;
 
 		this.amInterval = config.getInteger(EDFOptions.AM_INTERVAL_SECS);
 		this.roundsBetweenPlanning = config.getInteger(EDFOptions.AM_ROUNDS_BEFORE_PLANNING);
+
 		EDFLogger.log("EDF: AM Interval: "+ amInterval+", OM Interval: "+
 				config.getLong(EDFOptions.EDF_OM_INTERVAL_SECS)+", Rounds Before Planning: " + roundsBetweenPlanning,
 			LogLevel.INFO, it.uniroma2.edf.am.ApplicationManager.class);
 
+		this.appMonitor = new ApplicationMonitor(jobGraph, configuration);
 		this.globalActuator = new GlobalActuator();
 		this.reconfManager = new ReconfigurationManager();
 		this.statistics = new EDFlinkStatistics();

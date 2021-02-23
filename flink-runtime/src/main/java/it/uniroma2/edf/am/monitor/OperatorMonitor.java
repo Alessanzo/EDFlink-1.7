@@ -8,8 +8,8 @@ import org.apache.flink.runtime.jobgraph.JobGraph;
 import java.util.ArrayList;
 import java.util.Collections;
 
-public class OperatorMonitorProva extends Monitor{
-	public OperatorMonitorProva(JobGraph jobGraph, Configuration configuration) {
+public class OperatorMonitor extends Monitor{
+	public OperatorMonitor(JobGraph jobGraph, Configuration configuration) {
 		super(jobGraph, configuration);
 	}
 
