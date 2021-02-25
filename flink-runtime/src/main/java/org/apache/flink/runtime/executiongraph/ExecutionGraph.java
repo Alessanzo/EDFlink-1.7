@@ -620,8 +620,8 @@ public class ExecutionGraph implements AccessExecutionGraph {
 		return jobInformationOrBlobKey;
 	}
 
-	//EDF
-
+	//HEDF
+	//method to let Execution Class know the resType wanted for the Task it is trying to Schedule
 	public HashMap<JobVertexID, ArrayList<Integer>> getTaskResTypes() { return jobInformation.getTaskResTypes(); }
 
 	@Override

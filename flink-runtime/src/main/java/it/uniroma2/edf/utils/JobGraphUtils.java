@@ -1,4 +1,4 @@
-package it.uniroma2.edf;
+package it.uniroma2.edf.utils;
 
 import org.apache.flink.runtime.jobgraph.JobEdge;
 import org.apache.flink.runtime.jobgraph.JobGraph;

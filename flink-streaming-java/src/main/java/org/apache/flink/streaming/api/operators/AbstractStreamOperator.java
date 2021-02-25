@@ -18,7 +18,7 @@
 
 package org.apache.flink.streaming.api.operators;
 
-import it.uniroma2.edf.EDFLogger;
+import it.uniroma2.edf.utils.EDFLogger;
 import org.apache.flink.annotation.PublicEvolving;
 import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.api.common.ExecutionConfig;
@@ -251,7 +251,7 @@ public abstract class AbstractStreamOperator<OUT>
 					}
 				});
 			}
-			EDFLogger.log("EDF - Metrics: CpuUsage mod " + config.getConfiguration().getString(EDFOptions.CPU_USAGE_MODE) +
+			EDFLogger.log("HEDF: Metrics: CpuUsage mod " + config.getConfiguration().getString(EDFOptions.CPU_USAGE_MODE) +
 				", CpuUsage interval: " + cpuUsageInterval, LogLevel.INFO, AbstractStreamOperator.class);
 
 

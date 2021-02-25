@@ -18,8 +18,7 @@
 
 package org.apache.flink.runtime.taskexecutor.slot;
 
-import com.esotericsoftware.minlog.Log;
-import it.uniroma2.edf.EDFLogger;
+import it.uniroma2.edf.utils.EDFLogger;
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.time.Time;
 import org.apache.flink.runtime.clusterframework.types.AllocationID;
@@ -27,7 +26,6 @@ import org.apache.flink.runtime.clusterframework.types.ResourceID;
 import org.apache.flink.runtime.clusterframework.types.ResourceProfile;
 import org.apache.flink.runtime.clusterframework.types.SlotID;
 import org.apache.flink.runtime.executiongraph.ExecutionAttemptID;
-import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.taskexecutor.SlotReport;
 import org.apache.flink.runtime.taskexecutor.SlotStatus;
 import org.apache.flink.runtime.taskmanager.Task;
@@ -99,12 +97,12 @@ public class TaskSlotTable implements TimeoutListener<AllocationID> {
 
 		int index = 0;
 
-		//EDF
-		// create the task slots for the given resource profiles
+		/*----HEDF resType Association with each Task Slot for Scheduling purposes---*/
+		// create the task slots for the given Resource Profiles
 		for (ResourceProfile resourceProfile: resourceProfiles) {
 			taskSlots.set(index, new TaskSlot(index, resourceProfile));
-			EDFLogger.log("EDF: New Task Slot wit Index " + taskSlots.get(index).getIndex() +
-				", with resourceProfile "+ taskSlots.get(index).getResourceProfile().getResourceType(), LogLevel.INFO, TaskSlotTable.class);
+			EDFLogger.log("HEDF: New Task Slot wit Index: " + taskSlots.get(index).getIndex() +
+				", with Resource Type resType: "+ taskSlots.get(index).getResourceProfile().getResourceType(), LogLevel.INFO, TaskSlotTable.class);
 			++index;
 		}
 

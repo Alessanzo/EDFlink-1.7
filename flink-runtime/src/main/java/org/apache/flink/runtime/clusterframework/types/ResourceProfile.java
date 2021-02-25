@@ -54,7 +54,7 @@ public class ResourceProfile implements Serializable, Comparable<ResourceProfile
 	/** ResourceProfile which matches any other ResourceProfile. */
 	public static final ResourceProfile ANY = new ResourceProfile(Double.MAX_VALUE, Integer.MAX_VALUE, Integer.MAX_VALUE, Integer.MAX_VALUE, Integer.MAX_VALUE, Collections.emptyMap());
 
-	//EDF
+	//HEDF
 	public static ResourceProfile getAny(int resourceType){
 		return new ResourceProfile(resourceType);
 	}

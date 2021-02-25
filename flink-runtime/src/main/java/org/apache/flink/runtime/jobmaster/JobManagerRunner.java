@@ -20,10 +20,9 @@ package org.apache.flink.runtime.jobmaster;
 
 import it.uniroma2.dspsim.ConfigurationKeys;
 import it.uniroma2.dspsim.dsp.Application;
-import it.uniroma2.edf.EDFLogger;
-import it.uniroma2.edf.am.EDFlink;
-import it.uniroma2.edf.am.EDFlinkAppBuilder;
-import it.uniroma2.edf.am.monitor.ApplicationMonitor;
+import it.uniroma2.edf.utils.EDFLogger;
+import it.uniroma2.edf.HEDFlink;
+import it.uniroma2.edf.am.HEDFlinkAppBuilder;
 import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.api.common.time.Time;
 import org.apache.flink.configuration.Configuration;
@@ -166,20 +165,11 @@ public class JobManagerRunner implements LeaderContender, OnCompletionActions, A
 				rpcService);
 
 
-			//EDFlink.initialize();
+			/*-----------------HEDF ANCHOR POINT HEDFlink initializes MAPE Cycle--------------------*/
 
-
-
-			Application application = EDFlinkAppBuilder.buildApplication(jobGraph);
-			it.uniroma2.dspsim.Configuration conf = it.uniroma2.dspsim.Configuration.getInstance();
-			double latencySLO = conf.getDouble(ConfigurationKeys.SLO_LATENCY_KEY, 0.100);
-			EDFLogger.log("EDF: latencySLO: "+latencySLO, LogLevel.INFO, JobManagerRunner.class);
-			EDFlink edFlink= new EDFlink(application, configuration, jobGraph, dispatcher, latencySLO);
-
-
-			// EDF: launch the ApplicationManager
-			//ApplicationManager am = ApplicationManagerFactory.newApplicationManager(configuration, jobGraph, dispatcher);
-			//new Thread(am).start();
+			//Application building based on jobGraph topology as needed by Scaling Policies that rely on it
+			Application application = HEDFlinkAppBuilder.buildApplication(jobGraph);
+			HEDFlink edFlink= new HEDFlink(application, configuration, jobGraph, dispatcher);
 
 			// now start the JobManager
 			this.jobMaster = new JobMaster(

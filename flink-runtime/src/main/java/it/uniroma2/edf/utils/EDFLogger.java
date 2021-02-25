@@ -1,4 +1,4 @@
-package it.uniroma2.edf;
+package it.uniroma2.edf.utils;
 
 import org.apache.flink.shaded.netty4.io.netty.handler.logging.LogLevel;
 import org.slf4j.Logger;
@@ -6,10 +6,6 @@ import org.slf4j.LoggerFactory;
 
 
 public class EDFLogger {
-
-	/**
-	 *EFLINK CLASS TO WRITE ON FILE IN CONTAINER VOLUME
-	 */
 
 	public static synchronized void log(String text, LogLevel level, Class writeClass){
 

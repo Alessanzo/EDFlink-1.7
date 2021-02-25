@@ -18,8 +18,8 @@
 
 package org.apache.flink.runtime.taskexecutor;
 
-import it.uniroma2.edf.EDFLogger;
-import it.uniroma2.edf.EDFlinkConfiguration;
+import it.uniroma2.edf.utils.EDFLogger;
+import it.uniroma2.edf.HEDFlinkConfiguration;
 import org.apache.flink.api.common.time.Time;
 import org.apache.flink.configuration.*;
 import org.apache.flink.core.fs.FileSystem;
@@ -359,10 +359,9 @@ public class TaskManagerRunner implements FatalErrorHandler, AutoCloseableAsync 
 		checkNotNull(highAvailabilityServices);
 
 		LOG.info("Starting TaskManager with ResourceID: {}", resourceID);
-		EDFLogger.log("EDF: Proprietà di sistema: " + System.getProperty("resType"), LogLevel.INFO, TaskManagerRunner.class);
 
-		//EDF: parsing Policies properties
-		it.uniroma2.dspsim.Configuration conf = EDFlinkConfiguration.getEDFlinkConfInstance();
+		//HEDF: parsing Policies properties from config.properties, located in standard Flink conf folder
+		it.uniroma2.dspsim.Configuration conf = HEDFlinkConfiguration.getEDFlinkConfInstance();
 		String filepath = System.getenv(ConfigConstants.ENV_FLINK_CONF_DIR) + "/config.properties";
 		//conf.parseDefaultConfigurationFile();
 		conf.parseConfigurationFile(filepath);

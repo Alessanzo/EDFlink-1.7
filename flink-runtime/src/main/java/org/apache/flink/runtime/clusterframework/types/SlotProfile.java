@@ -35,7 +35,7 @@ import java.util.Set;
  */
 public class SlotProfile {
 
-	//EDF
+	//HEDF strict or relaxed HEDFSchedulingStrategy
 	private boolean strictSchedReq = true;
 
 	/** Singleton object for a slot profile without any requirements. */
@@ -77,7 +77,7 @@ public class SlotProfile {
 		this.previousExecutionGraphAllocations = previousExecutionGraphAllocations;
 	}
 
-	//EDF
+	//HEDF change HEDFSchedulingStrategy to Relaxed when needed
 	public void setRelaxedSchedReq(){
 		this.strictSchedReq = false;
 	}

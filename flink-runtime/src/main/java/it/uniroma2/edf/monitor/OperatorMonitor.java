@@ -1,14 +1,11 @@
-package it.uniroma2.edf.am.monitor;
+package it.uniroma2.edf.monitor;
 
-import it.uniroma2.dspsim.ConfigurationKeys;
 import it.uniroma2.dspsim.dsp.edf.om.OMMonitoringInfo;
+import it.uniroma2.edf.monitor.Monitor;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.runtime.jobgraph.JobGraph;
 
-import java.util.ArrayList;
-import java.util.Collections;
-
-public class OperatorMonitor extends Monitor{
+public class OperatorMonitor extends Monitor {
 	public OperatorMonitor(JobGraph jobGraph, Configuration configuration) {
 		super(jobGraph, configuration);
 	}

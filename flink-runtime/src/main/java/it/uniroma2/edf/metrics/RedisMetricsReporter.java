@@ -1,6 +1,6 @@
 package it.uniroma2.edf.metrics;
 
-import it.uniroma2.edf.EDFLogger;
+import it.uniroma2.edf.utils.EDFLogger;
 import org.apache.flink.metrics.*;
 import org.apache.flink.metrics.reporter.MetricReporter;
 import org.apache.flink.metrics.reporter.Scheduled;
@@ -217,7 +217,6 @@ public class RedisMetricsReporter implements MetricReporter, Scheduled {
 			String key = String.format("executionTime.%s.%s.%s", jobId, operator, subtaskId);
 			jedis.set(key, String.valueOf(stats.getMean()));
 			LOG.info("J={}, operator={}, subtask={}, exec time = {}", jobId, operator, subtaskId, stats.getMean());
-			// TODO getQuantile(0.99) ....
 		} else {
 			LOG.info("J={}, operator={}, subtask={}, input rate = {}", jobId, operator, subtaskId, stats.getMean());
 		}
@@ -254,13 +253,12 @@ public class RedisMetricsReporter implements MetricReporter, Scheduled {
 			subtaskId = fields[12];
 		}
 
-		EDFLogger.log("EDF: latenza " + stats.getMean() + ", operator "+ operator +", subtask"+subtaskId, LogLevel.INFO, RedisMetricsReporter.class);
+		EDFLogger.log("HEDF: latency " + stats.getMean() + ", operator "+ operator +", subtask"+subtaskId, LogLevel.INFO, RedisMetricsReporter.class);
 
 		if (publishOnRedis) {
 			//String key = String.format("latency.%s.%s.%s.%s.%s", jobId, sourceId, sourceSubtaskId, operator, subtaskId);
 			String key = String.format("latency.%s.%s.%s.%s.%s", jobId, operator, subtaskId, sourceId, sourceSubtaskId);
 			jedis.set(key, String.valueOf(stats.getMean()));
-			// TODO getQuantile(0.99) ....
 		} else {
 			LOG.info("J={}, operator={}, subtask={}, input rate = {}", jobId, operator, subtaskId, stats.getMean());
 		}

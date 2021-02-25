@@ -1,6 +1,6 @@
-package it.uniroma2.edf.am.execute;
+package it.uniroma2.edf.am;
 
-import it.uniroma2.edf.EDFLogger;
+import it.uniroma2.edf.utils.EDFLogger;
 import org.apache.flink.runtime.dispatcher.Dispatcher;
 import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.jobgraph.JobVertex;

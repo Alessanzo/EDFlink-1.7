@@ -4,12 +4,14 @@ import it.uniroma2.dspsim.Configuration;
 import org.apache.flink.configuration.ConfigConstants;
 
 import java.io.*;
-
-public class EDFlinkConfiguration extends Configuration {
+//*HEDFlink Class that enables reading config.properties properties, in the code points where it is needed, accessing to
+// the Singleton instance
+// */
+public class HEDFlinkConfiguration extends Configuration {
 
 	public static synchronized Configuration getEDFlinkConfInstance(){
 		if (instance == null) {
-			instance = new EDFlinkConfiguration();
+			instance = new HEDFlinkConfiguration();
 		}
 		return instance;
 	}

@@ -18,11 +18,8 @@
 
 package org.apache.flink.runtime.entrypoint;
 
-import it.uniroma2.dspsim.ConfigurationKeys;
-import it.uniroma2.dspsim.infrastructure.ComputingInfrastructure;
-import it.uniroma2.edf.EDFLogger;
-import it.uniroma2.edf.EDFlinkConfiguration;
-import it.uniroma2.edf.am.EDFlink;
+import it.uniroma2.edf.utils.EDFLogger;
+import it.uniroma2.edf.HEDFlink;
 import org.apache.flink.api.common.time.Time;
 import org.apache.flink.configuration.ClusterOptions;
 import org.apache.flink.configuration.ConfigOption;
@@ -169,9 +166,9 @@ public abstract class ClusterEntrypoint implements AutoCloseableAsync, FatalErro
 	public void startCluster() throws ClusterEntrypointException {
 		LOG.info("Starting {}.", getClass().getSimpleName());
 
-		//EDF: read configuration info for EDFlink
-		EDFlink.initialize();
-		EDFLogger.log("EDF: initializing EDFlink Configuration and Infrastructure", LogLevel.INFO, ClusterEntrypoint.class);
+		//EDF: read configuration info for HEDFlink
+		HEDFlink.initialize();
+		EDFLogger.log("HEDF: initializing HEDFlink Configuration and Infrastructure", LogLevel.INFO, ClusterEntrypoint.class);
 
 		try {
 			configureFileSystems(configuration);

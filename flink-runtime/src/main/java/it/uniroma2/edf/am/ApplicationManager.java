@@ -1,10 +1,9 @@
 package it.uniroma2.edf.am;
 
 //import it.uniroma2.edf.am.monitor.ApplicationMonitor;
-import it.uniroma2.edf.EDFLogger;
-import it.uniroma2.edf.JobGraphUtils;
-import it.uniroma2.edf.am.execute.GlobalActuator;
-import it.uniroma2.edf.am.monitor.ApplicationMonitorOld;
+import it.uniroma2.edf.monitor.ApplicationMonitorOld;
+import it.uniroma2.edf.utils.EDFLogger;
+import it.uniroma2.edf.utils.JobGraphUtils;
 import org.apache.flink.api.common.time.Time;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.EDFOptions;
@@ -313,7 +312,7 @@ public class ApplicationManager implements Runnable {
 						deployedCounter.wait();
 					} catch (InterruptedException e) {
 						Thread.currentThread().interrupt();
-						EDFLogger.log("Thread interrupted " + e.getMessage(), LogLevel.ERROR, EDFlinkApplicationManager.class);
+						EDFLogger.log("Thread interrupted " + e.getMessage(), LogLevel.ERROR, HEDFlinkApplicationManager.class);
 					}
 				}
 			}

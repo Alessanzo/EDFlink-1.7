@@ -52,7 +52,7 @@ import java.util.concurrent.CompletableFuture;
  */
 public interface ResourceManagerGateway extends FencedRpcGateway<ResourceManagerId> {
 
-	//EDF
+	//HEDF
 	boolean isResTypeSlotAvailable(SlotProfile slotProfile);
 
 	/**

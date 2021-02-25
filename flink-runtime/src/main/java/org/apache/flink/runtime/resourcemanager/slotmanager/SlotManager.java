@@ -18,8 +18,7 @@
 
 package org.apache.flink.runtime.resourcemanager.slotmanager;
 
-import akka.event.Logging;
-import it.uniroma2.edf.EDFLogger;
+import it.uniroma2.edf.utils.EDFLogger;
 import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.time.Time;
@@ -496,6 +495,8 @@ public class SlotManager implements AutoCloseable {
 		return null;
 	}
 
+	/*-----HEDF Scheduling Method for Task Slot allocation with RELAXED logic,
+	a TaskSlot must always be returned if available-------*/
 	/**
 	 * Finds a matching slot for a given resource profile. A matching slot has at least as many
 	 * resources available as the given resource profile. If there is no such slot available, then
@@ -509,9 +510,9 @@ public class SlotManager implements AutoCloseable {
 	 * slot available.
 	 */
 	protected TaskManagerSlot findMatchingSlot(ResourceProfile requestResourceProfile) {
-		EDFLogger.log("EDF: Allocazione Slot dal ResourceManager", LogLevel.INFO, SlotManager.class);
+		EDFLogger.log("HEDF: ResourceManager Slot allocation", LogLevel.INFO, SlotManager.class);
 		Iterator<Map.Entry<SlotID, TaskManagerSlot>> iterator = freeSlots.entrySet().iterator();
-		if (freeSlots.size() == 0) EDFLogger.log("EDF: NON CI SONO SLOT DISPONIBILI NEL RM", LogLevel.INFO, SlotManager.class);
+		if (freeSlots.size() == 0) EDFLogger.log("HEDF: NO AVAILABLE SLOTS IN RESOURCE MANAGER", LogLevel.INFO, SlotManager.class);
 
 		TaskManagerSlot bestCandidate = null;
 		int candidateType = -1;
@@ -529,33 +530,34 @@ public class SlotManager implements AutoCloseable {
 
 
 			if (taskManagerSlot.getResourceProfile().isMatching(requestResourceProfile)) {
-				if (candidateType == requestType) {
-					EDFLogger.log("EDF: Lo Slot allocato nel RM matcha!", LogLevel.INFO, SlotManager.class);
+				if (candidateType == requestType) { //exact match!
+					EDFLogger.log("HEDF: Slot allocated by RM matches STRICTLY", LogLevel.INFO, SlotManager.class);
 					iterator.remove();
 					return taskManagerSlot;
 				}
-				else if (candidateType > requestType) {
+				else if (candidateType > requestType) { //second best choice if there isn't any exact match
 					bestCandidate = taskManagerSlot;
 				}
-				else if (bestCandidate == null) {
+				else if (bestCandidate == null) { //one Slot among those available must be returned
 					bestCandidate = taskManagerSlot;
 				}
 			}
 		}
 
-		if (bestCandidate == null) EDFLogger.log("EDF: NON CI SONO SLOT DISPONIBILI NEL RM", LogLevel.INFO, SlotManager.class);
+		if (bestCandidate == null) EDFLogger.log("HEDF: NO AVAILABLE SLOTS IN RESOURCE MANAGER", LogLevel.INFO, SlotManager.class);
 		else if (bestCandidate.getResourceProfile().getResourceType() > requestType) {
-			EDFLogger.log("EDF: Lo Slot allocato nel RM non matcha, ma ha un tipo maggiore", LogLevel.INFO, SlotManager.class);
+			EDFLogger.log("HEDF: Slot allocated by RM has bigger resType", LogLevel.INFO, SlotManager.class);
 			freeSlots.remove(bestCandidate.getSlotId());
 		}
 		else {
-			EDFLogger.log("EDF: Lo Slot allocato nel RM non matcha", LogLevel.INFO, SlotManager.class);
+			EDFLogger.log("HEDF: Slot allocated by RM is no matching nor bigger", LogLevel.INFO, SlotManager.class);
 			freeSlots.remove(bestCandidate.getSlotId());
 		}
 		return bestCandidate;
 	}
 
-	//EDF
+	/*HEDF query Resource Manager to know if there are Tasks with resType matching strictly, where there aren't in the
+	* SlotPool.*/
 	public boolean strictMatchSlotResType(SlotProfile slotProfile){
 		Iterator<Map.Entry<SlotID, TaskManagerSlot>> iterator = freeSlots.entrySet().iterator();
 		ResourceProfile requestResourceProfile = slotProfile.getResourceProfile();
@@ -567,23 +569,11 @@ public class SlotManager implements AutoCloseable {
 			candidateResourceProfile = taskManagerSlot.getResourceProfile();
 			candidateType = taskManagerSlot.getResourceProfile().getResourceType();
 
-			/*
-			// sanity check
-			Preconditions.checkState(
-				taskManagerSlot.getState() == TaskManagerSlot.State.FREE,
-				"TaskManagerSlot %s is not in state FREE but %s.",
-				taskManagerSlot.getSlotId(), taskManagerSlot.getState());
-
-			*/
 			//resType check
 			if (candidateResourceProfile.isMatching(requestResourceProfile) && (candidateType == requestType)) {
-				EDFLogger.log("EDF: RM Slots Check - Esiste uno Slot nel RM che matcha strict!", LogLevel.INFO,
-					SlotManager.class);
 				return true;
 			}
 		}
-		EDFLogger.log("EDF: RM Slots Check - NON esiste uno Slot nel RM che matcha strict", LogLevel.INFO,
-			SlotManager.class);
 		return false;
 	}
 

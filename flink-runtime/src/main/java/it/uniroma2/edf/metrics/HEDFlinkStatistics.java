@@ -10,7 +10,7 @@ import it.uniroma2.dspsim.stats.metrics.RealValuedMetric;
 
 import java.io.*;
 
-public class EDFlinkStatistics extends Statistics {
+public class HEDFlinkStatistics extends Statistics {
 
 	final String STAT_LATENCY_VIOLATIONS = "Violations";
 	final String STAT_RECONFIGURATIONS = "Reconfigurations";
@@ -29,7 +29,7 @@ public class EDFlinkStatistics extends Statistics {
 	BufferedWriter replicasOutput = null;
 	BufferedWriter latenciesOutput = null;
 
-	public EDFlinkStatistics() {
+	public HEDFlinkStatistics() {
 		super();
 		registerMetrics();
 

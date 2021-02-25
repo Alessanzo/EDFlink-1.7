@@ -18,7 +18,6 @@
 
 package org.apache.flink.runtime.executiongraph;
 
-import it.uniroma2.edf.EDFLogger;
 import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.api.common.Archiveable;
 import org.apache.flink.api.common.JobID;
@@ -50,7 +49,6 @@ import org.apache.flink.runtime.jobmaster.slotpool.SlotProvider;
 import org.apache.flink.runtime.state.KeyGroupRangeAssignment;
 import org.apache.flink.runtime.taskmanager.TaskManagerLocation;
 import org.apache.flink.runtime.util.EvictingBoundedList;
-import org.apache.flink.shaded.netty4.io.netty.handler.logging.LogLevel;
 import org.apache.flink.types.Either;
 import org.apache.flink.util.ExceptionUtils;
 import org.apache.flink.util.Preconditions;

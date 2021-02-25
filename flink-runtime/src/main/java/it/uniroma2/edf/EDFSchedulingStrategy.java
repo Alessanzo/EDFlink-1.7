@@ -1,11 +1,11 @@
 package it.uniroma2.edf;
 
+import it.uniroma2.edf.utils.EDFLogger;
 import org.apache.flink.runtime.clusterframework.types.ResourceID;
 import org.apache.flink.runtime.clusterframework.types.SlotProfile;
 import org.apache.flink.runtime.jobmanager.scheduler.Locality;
 import org.apache.flink.runtime.jobmaster.SlotInfo;
 import org.apache.flink.runtime.jobmaster.slotpool.SchedulingStrategy;
-import org.apache.flink.runtime.taskmanager.Task;
 import org.apache.flink.runtime.taskmanager.TaskManagerLocation;
 import org.apache.flink.shaded.netty4.io.netty.handler.logging.LogLevel;
 
@@ -24,8 +24,6 @@ import java.util.stream.Stream;
 public class EDFSchedulingStrategy implements SchedulingStrategy {
 
 	private static final EDFSchedulingStrategy INSTANCE = new EDFSchedulingStrategy();
-
-	private static final BiFunction<Integer, Integer, Integer> LOCALITY_EVALUATION_FUNCTION = (localWeigh, hostLocalWeigh) -> localWeigh * 10 + hostLocalWeigh;
 
 	EDFSchedulingStrategy(){}
 
@@ -71,6 +69,7 @@ public class EDFSchedulingStrategy implements SchedulingStrategy {
 				resultProducer);
 	}
 
+	//STRICT approach for choosing the Slot: a Slot is returned if and only if its resType matches strictly with the one requested
 	protected  <IN, OUT> OUT doFindMatchStrict(
 		@Nonnull SlotProfile slotProfile,
 		@Nonnull Stream<IN> candidates,
@@ -78,7 +77,7 @@ public class EDFSchedulingStrategy implements SchedulingStrategy {
 		@Nonnull Predicate<IN> additionalRequirementsFilter,
 		@Nonnull BiFunction<IN, Locality, OUT> resultProducer) {
 
-		EDFLogger.log("EDF: Scheduler STRICT in azione per schedulare un Task tra gli Slot dello SlotPool", LogLevel.INFO, EDFSchedulingStrategy.class);
+		EDFLogger.log("HEDF: Slot Allocation by SlotPool. Strategy: STRICT", LogLevel.INFO, EDFSchedulingStrategy.class);
 
 		Iterator<IN> iterator = candidates.iterator();
 
@@ -87,17 +86,19 @@ public class EDFSchedulingStrategy implements SchedulingStrategy {
 			if (additionalRequirementsFilter.test(candidate)) {
 				SlotInfo slotContext = contextExtractor.apply(candidate);
 				if (slotContext.getTaskManagerLocation().getResType() == slotProfile.getResourceProfile().getResourceType()) {
-					EDFLogger.log("ResourceType matcha con richiesta!", LogLevel.INFO, EDFSchedulingStrategy.class);
+					EDFLogger.log("HEDF: Slot resType exact Matching in SlotPool", LogLevel.INFO, EDFSchedulingStrategy.class);
 					return resultProducer.apply(candidate, Locality.LOCAL);
 				}
 			}
 		}
 
-		EDFLogger.log("EDF: Non ci sono slot che matchano!", LogLevel.INFO, EDFSchedulingStrategy.class);
+		EDFLogger.log("HEDF: No exact Matching Slot found in SlotPool", LogLevel.INFO, EDFSchedulingStrategy.class);
 		return  null;
 
 	}
 
+	//RELAXED approach for choosing the Slot: score based priority where exact resType matching has the absolute priority
+	//then bigger resType than requested, then other Slots that best fit Locality requirements
 	protected  <IN, OUT> OUT doFindMatchRelaxed(
 		@Nonnull SlotProfile slotProfile,
 		@Nonnull Stream<IN> candidates,
@@ -105,7 +106,7 @@ public class EDFSchedulingStrategy implements SchedulingStrategy {
 		@Nonnull Predicate<IN> additionalRequirementsFilter,
 		@Nonnull BiFunction<IN, Locality, OUT> resultProducer) {
 
-		EDFLogger.log("EDF: Scheduler RELAXED in azione per schedulare un Task tra gli Slot dello SlotPool", LogLevel.INFO, EDFSchedulingStrategy.class);
+		EDFLogger.log("HEDF: Slot Allocation by SlotPool. Strategy: RELAXED", LogLevel.INFO, EDFSchedulingStrategy.class);
 		Iterator<IN> iterator = candidates.iterator();
 
 		IN bestCandidate = null;
@@ -119,13 +120,13 @@ public class EDFSchedulingStrategy implements SchedulingStrategy {
 
 				if(slotContext.getTaskManagerLocation().getResType() >= slotProfile.getResourceProfile().getResourceType()){
 					if(slotContext.getTaskManagerLocation().getResType() == slotProfile.getResourceProfile().getResourceType()) {
-						currentCandidateScore = 100;
+						currentCandidateScore = 100; //highest score to be topped just by other exactly matching Slots
 					}
-					else currentCandidateScore = 50;
+					else currentCandidateScore = 50;//second highest score
 				}
 				for (TaskManagerLocation location: slotProfile.getPreferredLocations()) {
 					if (slotContext.getTaskManagerLocation().getResourceID() == location.getResourceID())
-						currentCandidateScore++;
+						currentCandidateScore++;//one more poit for every LocationPreference met
 				}
 				if (currentCandidateScore > bestCandidateScore) {
 					bestCandidate = candidate;
@@ -136,9 +137,9 @@ public class EDFSchedulingStrategy implements SchedulingStrategy {
 
 		// at the end of the iteration, we return the candidate with best possible locality or null.
 		if (bestCandidate != null) {
-			if (currentCandidateScore >= 100) EDFLogger.log("EDF: Lo Slot scelto dallo Scheduler matcha!", LogLevel.INFO, EDFSchedulingStrategy.class);
-			else if (currentCandidateScore >= 50) EDFLogger.log("EDF: Lo Slot scelto dallo Scheduler non matcha, ma ha un tipo maggiore", LogLevel.INFO, EDFSchedulingStrategy.class);
-			else EDFLogger.log("EDF: Lo Slot scelto dallo Scheduler non matcha", LogLevel.INFO, EDFSchedulingStrategy.class);
+			if (currentCandidateScore >= 100) EDFLogger.log("HEDF: Slot resType exact Matching in SlotPool", LogLevel.INFO, EDFSchedulingStrategy.class);
+			else if (currentCandidateScore >= 50) EDFLogger.log("HEDF: Slot chosen has bigger resType in SlotPool", LogLevel.INFO, EDFSchedulingStrategy.class);
+			else EDFLogger.log("HEDF: chosen Slot resType is not matching nor bigger in SlotPool", LogLevel.INFO, EDFSchedulingStrategy.class);
 			return resultProducer.apply(bestCandidate, Locality.LOCAL);
 		} else {
 			return null;

@@ -114,7 +114,7 @@ public class TaskManagerLocation implements Comparable<TaskManagerLocation>, jav
 				"%s @ %s (dataPort=%d)", resourceID, fqdnHostName, dataPort);
 	}
 
-	//EDF
+	/*---HEDF--*/
 	public TaskManagerLocation(ResourceID resourceID, InetAddress inetAddress, int dataPort, int resType) {
 		this(resourceID,inetAddress,dataPort);
 		this.resType = resType;
@@ -124,7 +124,7 @@ public class TaskManagerLocation implements Comparable<TaskManagerLocation>, jav
 	//  Getters
 	// ------------------------------------------------------------------------
 
-	//EDF
+	//HEDF
 	public int getResType() {
 		return resType;
 	}

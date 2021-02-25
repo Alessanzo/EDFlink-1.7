@@ -1,4 +1,4 @@
-package it.uniroma2.edf.am.plan;
+package it.uniroma2.edf.am;
 
 import it.uniroma2.dspsim.dsp.Operator;
 import it.uniroma2.dspsim.dsp.Reconfiguration;

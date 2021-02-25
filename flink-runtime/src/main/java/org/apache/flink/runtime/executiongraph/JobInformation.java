@@ -59,7 +59,7 @@ public class JobInformation implements Serializable {
 	/** URLs specifying the classpath to add to the class loader */
 	private final Collection<URL> requiredClasspathURLs;
 
-	//EDF
+	//HEDF
 	private HashMap<JobVertexID, ArrayList<Integer>> taskResTypes;
 
 	public JobInformation(
@@ -89,7 +89,7 @@ public class JobInformation implements Serializable {
 		this.taskResTypes = taskResTypes;
 	}
 
-	//EDF
+	//HEDF method to let Execution Class know the resType wanted for the Task it is trying to Schedule
 	public HashMap<JobVertexID, ArrayList<Integer>> getTaskResTypes() {
 		return taskResTypes;
 	}

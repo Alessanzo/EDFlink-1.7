@@ -1,4 +1,4 @@
-package it.uniroma2.edf.am;
+package it.uniroma2.edf.om;
 
 import it.uniroma2.dspsim.Configuration;
 import it.uniroma2.dspsim.dsp.Operator;
@@ -12,14 +12,14 @@ import it.uniroma2.dspsim.dsp.edf.om.threshold.MinCostThresholdPolicy;
 import it.uniroma2.dspsim.dsp.edf.om.threshold.RandomSelectionThresholdPolicy;
 import it.uniroma2.dspsim.dsp.edf.om.threshold.ThresholdPolicy;
 
-public class EDFlinkThresholdBasedOM extends ThresholdBasedOM {
+public class HEDFlinkThresholdBasedOM extends ThresholdBasedOM {
 
 	public static final String THRESHOLD_POLICY = "edf.om.threshold.policy";
 
 	private final ThresholdPolicy thresholdPolicy = selectThresholdPolicy();
 	private final double scaleOutThreshold = Configuration.getInstance().getDouble("edf.om.threshold", 0.7D);
 
-	public EDFlinkThresholdBasedOM(Operator operator) {
+	public HEDFlinkThresholdBasedOM(Operator operator) {
 		super(operator);
 	}
 

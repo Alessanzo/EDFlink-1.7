@@ -6,10 +6,11 @@ import it.uniroma2.dspsim.dsp.Application;
 import it.uniroma2.dspsim.dsp.ApplicationBuilder;
 import it.uniroma2.dspsim.dsp.Operator;
 import it.uniroma2.dspsim.dsp.queueing.MG1OperatorQueueModel;
-import it.uniroma2.edf.EDFLogger;
-import it.uniroma2.edf.EDFlinkConfiguration;
-import it.uniroma2.edf.JobGraphUtils;
-import it.uniroma2.edf.am.monitor.ApplicationMonitor;
+import it.uniroma2.edf.HEDFlink;
+import it.uniroma2.edf.utils.EDFLogger;
+import it.uniroma2.edf.HEDFlinkConfiguration;
+import it.uniroma2.edf.utils.JobGraphUtils;
+import it.uniroma2.edf.om.HEDFlinkOperator;
 import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.jobgraph.JobVertex;
 import org.apache.flink.shaded.netty4.io.netty.handler.logging.LogLevel;
@@ -19,7 +20,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.Set;
 
-public class EDFlinkAppBuilder extends ApplicationBuilder {
+public class HEDFlinkAppBuilder extends ApplicationBuilder {
 
 	static public Application buildApplication(JobGraph jobGraph){
 		Application app = new Application();
@@ -30,10 +31,10 @@ public class EDFlinkAppBuilder extends ApplicationBuilder {
 		final double serviceTimeMean = 1/mu;
 		final double serviceTimeVariance = 1.0/mu*1.0/mu/2.0;
 
-		Configuration conf = EDFlinkConfiguration.getEDFlinkConfInstance();
+		Configuration conf = HEDFlinkConfiguration.getEDFlinkConfInstance();
 		//creating Application Operators and adding them to it, with same Name as JobVertexes
 		final int maxParallelism = conf.getInteger(ConfigurationKeys.OPERATOR_MAX_PARALLELISM_KEY, 5);
-		EDFLogger.log("EDF: Operator Max Parallelism " + maxParallelism, LogLevel.INFO, EDFlinkAppBuilder.class);
+		EDFLogger.log("EDF: Operator Max Parallelism " + maxParallelism, LogLevel.INFO, HEDFlinkAppBuilder.class);
 		String[] operatorsServiceStats= conf.getString("simulation.service.stats", "").split(",");
 		int operatorNum = JobGraphUtils.listOperators(jobGraph, true, true).size();
 		double[] serviceStats = new double[2*operatorNum];
@@ -59,10 +60,10 @@ public class EDFlinkAppBuilder extends ApplicationBuilder {
 		int ops = 0;
 		for (JobVertex operator: JobGraphUtils.listSortedTopologicallyOperators(jobGraph, true, true)){
 
-			Operator appOp = new EDFlinkOperator(operator, operator.getName(),
+			Operator appOp = new HEDFlinkOperator(operator, operator.getName(),
 					new MG1OperatorQueueModel(serviceStats[ops], serviceStats[ops+1]), maxParallelism);
 			EDFLogger.log("EDF: Operator "+ operator.getName() +" with service time mean "+ serviceStats[ops]+
-				" and variance "+serviceStats[ops+1], LogLevel.INFO, EDFlinkAppBuilder.class);
+				" and variance "+serviceStats[ops+1], LogLevel.INFO, HEDFlinkAppBuilder.class);
 			ops = ops +2;
 			app.addOperator(appOp);
 			names2operators.put(operator.getName(), appOp);
@@ -80,9 +81,9 @@ public class EDFlinkAppBuilder extends ApplicationBuilder {
 		}
 		Collection<ArrayList<Operator>> paths = app.getAllPaths();
 		for (ArrayList<Operator> path: paths){
-			EDFLogger.log("Path Start: ", LogLevel.INFO, EDFlink.class);
+			EDFLogger.log("Path Start: ", LogLevel.INFO, HEDFlink.class);
 			for (Operator pathoperator: path){
-				EDFLogger.log("Operator in the path: "+pathoperator.getName(), LogLevel.INFO, EDFlink.class);
+				EDFLogger.log("Operator in the path: "+pathoperator.getName(), LogLevel.INFO, HEDFlink.class);
 			}
 		}
 		computeOperatorsSLO(app);

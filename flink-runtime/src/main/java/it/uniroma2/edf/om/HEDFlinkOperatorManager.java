@@ -1,4 +1,4 @@
-package it.uniroma2.edf.am;
+package it.uniroma2.edf.om;
 
 import it.uniroma2.dspsim.dsp.Operator;
 import it.uniroma2.dspsim.dsp.Reconfiguration;
@@ -9,14 +9,15 @@ import it.uniroma2.dspsim.dsp.edf.om.request.QBasedReconfigurationScore;
 import it.uniroma2.dspsim.dsp.edf.om.request.RewardBasedOMRequest;
 import it.uniroma2.dspsim.infrastructure.ComputingInfrastructure;
 import it.uniroma2.dspsim.infrastructure.NodeType;
-import it.uniroma2.edf.EDFLogger;
-import it.uniroma2.edf.am.monitor.ApplicationMonitorOld;
-import it.uniroma2.edf.am.monitor.OperatorMonitor;
+import it.uniroma2.edf.utils.EDFLogger;
+import it.uniroma2.edf.am.HEDFlinkApplicationManager;
+import it.uniroma2.edf.monitor.ApplicationMonitorOld;
+import it.uniroma2.edf.monitor.OperatorMonitor;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.EDFOptions;
 import org.apache.flink.shaded.netty4.io.netty.handler.logging.LogLevel;
 
-public class EDFlinkOperatorManager implements Runnable{
+public class HEDFlinkOperatorManager implements Runnable{
 
 	protected OperatorManager wrappedOM;
 	protected ApplicationMonitorOld appMonitor;
@@ -26,25 +27,10 @@ public class EDFlinkOperatorManager implements Runnable{
 
 	boolean recofigured = false;
 
-	public EDFlinkOperatorManager(OperatorManager operatorManager, ApplicationMonitorOld appMonitor) {
-		this.wrappedOM = operatorManager;
-		this.appMonitor = appMonitor;
-	}
-
-	public EDFlinkOperatorManager(OperatorManager operatorManager, ApplicationMonitorOld appMonitor, Configuration configuration) {
-		this.wrappedOM = operatorManager;
-		this.appMonitor = appMonitor;
-		this.omInterval = configuration.getLong(EDFOptions.EDF_OM_INTERVAL_SECS);
-	}
-
-	public EDFlinkOperatorManager(OperatorManager operatorManager, OperatorMonitor opMonitor, Configuration configuration) {
+	public HEDFlinkOperatorManager(OperatorManager operatorManager, OperatorMonitor opMonitor, Configuration configuration) {
 		this.wrappedOM = operatorManager;
 		this.opMonitor = opMonitor;
 		this.omInterval = configuration.getLong(EDFOptions.EDF_OM_INTERVAL_SECS);
-	}
-
-	public EDFlinkOperatorManager(OperatorManager operatorManager) {
-		this.wrappedOM = operatorManager;
 	}
 
 
@@ -60,14 +46,15 @@ public class EDFlinkOperatorManager implements Runnable{
 			this.reconfRequest = wrappedOM.pickReconfigurationRequest(monitoringInfo);
 			reconf = reconfRequest.getRequestedReconfiguration().toString();
 
-			EDFLogger.log("EDF: EDFLINKOM for Operator "+getWrappedOM().getOperator().getName()+
-					" monitored this Input Rate: "+monitoringInfo.getInputRate()+ " and this CPUUsage: "
+			EDFLogger.log("HEDF: HEDFlinkOM for Operator "+getWrappedOM().getOperator().getName()+
+					" monitored Input Rate: "+monitoringInfo.getInputRate()+ " and CPUUsage: "
 					+ monitoringInfo.getCpuUtilization()+ " and decided this Reconfiguration Request: "+ reconf
-				, LogLevel.INFO, EDFlinkOperatorManager.class);
+				, LogLevel.INFO, HEDFlinkOperatorManager.class);
 
 			waitReconfigured();
 
-			EDFLogger.log("EDF: EDFLINKOM waited for reconfiguration", LogLevel.INFO, EDFlinkOperatorManager.class);
+			EDFLogger.log("HEDF: "+ getWrappedOM().getOperator().getName()+" reconfiguration completed"
+				, LogLevel.INFO, HEDFlinkOperatorManager.class);
 		}
 	}
 
@@ -78,7 +65,7 @@ public class EDFlinkOperatorManager implements Runnable{
 					wait();
 				} catch (InterruptedException e) {
 					Thread.currentThread().interrupt();
-					EDFLogger.log("Thread interrupted " + e.getMessage(), LogLevel.ERROR, EDFlinkApplicationManager.class);
+					EDFLogger.log("Thread interrupted " + e.getMessage(), LogLevel.ERROR, HEDFlinkApplicationManager.class);
 				}
 			}
 		}
@@ -124,7 +111,7 @@ public class EDFlinkOperatorManager implements Runnable{
 			}
 			double operatorInputRate = appMonitor.getOperatorInputRate(wrappedOM.getOperator().getName());
 			EDFLogger.log("EDF: EDFLINKOM monitored for Operator "+getWrappedOM().getOperator().getName()+
-				" this Input Rate: "+operatorInputRate, LogLevel.INFO, EDFlinkOperatorManager.class);
+				" this Input Rate: "+operatorInputRate, LogLevel.INFO, HEDFlinkOperatorManager.class);
 			final double u = wrappedOM.getOperator().utilization(operatorInputRate);
 			OMMonitoringInfo monitoringInfo = new OMMonitoringInfo();
 			monitoringInfo.setInputRate(operatorInputRate);
@@ -149,13 +136,13 @@ public class EDFlinkOperatorManager implements Runnable{
 				reconf = reconfRequest.getRequestedReconfiguration().toString();
 				EDFLogger.log("EDF: EDFLINKOM for Operator "+getWrappedOM().getOperator().getName()+
 						" decided this Reconfiguration Request: "+ reconf
-					, LogLevel.INFO, EDFlinkOperatorManager.class);
+					, LogLevel.INFO, HEDFlinkOperatorManager.class);
 
 				if (!reconf.equals("(do nothing)"))
 					i++;
 			}
 			waitReconfigured();
-			EDFLogger.log("EDF: EDFLINKOM waited for reconfiguration", LogLevel.INFO, EDFlinkOperatorManager.class);
+			EDFLogger.log("EDF: EDFLINKOM waited for reconfiguration", LogLevel.INFO, HEDFlinkOperatorManager.class);
 		}
 	}
 }

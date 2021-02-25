@@ -18,7 +18,7 @@
 
 package org.apache.flink.runtime.executiongraph;
 
-import it.uniroma2.edf.EDFLogger;
+import it.uniroma2.edf.utils.EDFLogger;
 import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.api.common.Archiveable;
 import org.apache.flink.api.common.accumulators.Accumulator;
@@ -40,7 +40,6 @@ import org.apache.flink.runtime.execution.ExecutionState;
 import org.apache.flink.runtime.instance.SlotSharingGroupId;
 import org.apache.flink.runtime.io.network.ConnectionID;
 import org.apache.flink.runtime.io.network.partition.ResultPartitionID;
-import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.jobgraph.JobVertexID;
 import org.apache.flink.runtime.jobmanager.scheduler.CoLocationConstraint;
 import org.apache.flink.runtime.jobmanager.scheduler.LocationPreferenceConstraint;
@@ -478,12 +477,12 @@ public class Execution implements AccessExecution, Archiveable<ArchivedExecution
 		final SlotSharingGroup sharingGroup = vertex.getJobVertex().getSlotSharingGroup();
 		final CoLocationConstraint locationConstraint = vertex.getLocationConstraint();
 
-		//EDF
+		/*-----HEDF getting desired resType for this Task from JobGraph to be associated with the SlotProfile requested*/
 		HashMap<JobVertexID, ArrayList<Integer>> taskResTypes = vertex.getExecutionGraph().getTaskResTypes();
 		ArrayList<Integer> resTypesArray = taskResTypes.get(vertex.getJobvertexId());
 		int thisTaskResType = resTypesArray.get(vertex.getParallelSubtaskIndex());
-		EDFLogger.log("EDF: Task del Vertex " + vertex.getTaskNameWithSubtaskIndex() +
-			" richiede un ResourceProfile del tipo " + thisTaskResType, LogLevel.INFO, Execution.class);
+		EDFLogger.log("HEDF: Vertex Task num " + vertex.getTaskNameWithSubtaskIndex() +
+			" requests a Slot with resType: " + thisTaskResType, LogLevel.INFO, Execution.class);
 
 		// sanity check
 		if (locationConstraint != null && sharingGroup == null) {
@@ -520,8 +519,8 @@ public class Execution implements AccessExecution, Archiveable<ArchivedExecution
 							slotRequestId,
 							toSchedule,
 							queued,
-							new SlotProfile(
-								//EDF
+							new SlotProfile( //resType associated with SlotProfile for Scheduling
+								//HEDF
 								ResourceProfile.getUnknown(thisTaskResType),
 								preferredLocations,
 								previousAllocationIDs,
@@ -564,9 +563,10 @@ public class Execution implements AccessExecution, Archiveable<ArchivedExecution
 	 */
 	public void deploy() throws JobException {
 
-		//EDF
+		/*------HEDF getting to know the Slot resType where the Task has been deployed----------*/
 		final LogicalSlot slot  = assignedResource;
 		int slotResType = slot.getTaskManagerLocation().getResType();
+		//information needed is passed to the JobVertex to wich this Task belongs to, to be reached by HEDF components
 		vertex.getJobVertex().getJobVertex().setDeployedSlotResType(vertex.getParallelSubtaskIndex(), slotResType);
 
 		checkNotNull(slot, "In order to deploy the execution we first have to assign a resource via tryAssignResource.");

@@ -18,8 +18,7 @@
 
 package org.apache.flink.runtime.jobmaster.slotpool;
 
-import it.uniroma2.edf.EDFLogger;
-import it.uniroma2.edf.EDFSchedulingStrategy;
+import it.uniroma2.edf.utils.EDFLogger;
 import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.time.Time;
@@ -80,7 +79,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -631,6 +629,7 @@ public class SlotPool extends RpcEndpoint implements SlotPoolGateway, AllocatedS
 		}
 	}
 
+	//*HEDF new Scheduling logic scheme "Strict SlotPool, Relaxed ResourceManager, Relaxed SlotPool, Relaxed ResourceManager*/
 	private SlotSharingManager.MultiTaskSlotLocality allocateMultiTaskSlot(
 		AbstractID groupId,
 		SlotSharingManager slotSharingManager,
@@ -659,14 +658,14 @@ public class SlotPool extends RpcEndpoint implements SlotPoolGateway, AllocatedS
 
 		//if the strict maching strategies didn't find any Slot, we relax them
 		if (polledSlotAndLocality == null && resourceManagerGateway != null) {
-			EDFLogger.log("EDF: NO Strict ResType Slot found by EDFSchedulingStrategy", LogLevel.INFO,
+			EDFLogger.log("HEDF: NO STRICT ResType Slot found in SlotPool", LogLevel.INFO,
 				SlotPool.class);
 			//check on Resource Manager if we have a strict matching Slot on it
 			boolean resTypeSlotAvailable = resourceManagerGateway.isResTypeSlotAvailable(slotProfile);
 			//if we don't have it, we search for a relaxed matching Slot in the SlotPool, first ad resolved root and secondly as normal
 			if (!resTypeSlotAvailable){
 				slotProfile.setRelaxedSchedReq();
-				EDFLogger.log("EDF: Retrying with Relaxed ResType by EDFSchedulingStrategy", LogLevel.INFO,
+				EDFLogger.log("HEDF: RM querying says no strict matching. Retrying with RELAXED approach in SlotPool", LogLevel.INFO,
 					SlotPool.class);
 				multiTaskSlotLocality = slotSharingManager.getResolvedRootSlot(
 					groupId,
@@ -682,7 +681,7 @@ public class SlotPool extends RpcEndpoint implements SlotPoolGateway, AllocatedS
 
 
 		if (resourceManagerGateway == null)
-			EDFLogger.log("EDF: il gateway è nullo!", LogLevel.INFO,
+			EDFLogger.log("HEDF: gateway hasn't been instantiated yet", LogLevel.INFO,
 				SlotPool.class);
 
 		final SlotRequestId multiTaskSlotRequestId = new SlotRequestId();
@@ -1637,10 +1636,9 @@ public class SlotPool extends RpcEndpoint implements SlotPoolGateway, AllocatedS
 		SlotAndLocality poll(SchedulingStrategy schedulingStrategy, SlotProfile slotProfile) {
 			// fast path if no slots are available
 			if (availableSlots.isEmpty()) {
-				EDFLogger.log("EDF: NON CI SONO SLOT DISPONIBILI AL POLLING!", LogLevel.INFO, SlotPool.class);
+				EDFLogger.log("EDF: no Slots available in SlotPool!", LogLevel.INFO, SlotPool.class);
 				return null;
 			}
-			EDFLogger.log("EDF: CI SONO SLOT DISPONIBILI AL POLLING!", LogLevel.INFO, SlotPool.class);
 			Collection<SlotAndTimestamp> slotAndTimestamps = availableSlots.values();
 
 			SlotAndLocality matchingSlotAndLocality = schedulingStrategy.findMatchWithLocality(

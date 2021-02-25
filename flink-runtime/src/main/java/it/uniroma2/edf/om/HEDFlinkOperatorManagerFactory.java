@@ -1,9 +1,10 @@
-package it.uniroma2.edf.am;
+package it.uniroma2.edf.om;
 
 import it.uniroma2.dspsim.dsp.Operator;
 import it.uniroma2.dspsim.dsp.edf.om.*;
+import it.uniroma2.edf.om.HEDFlinkThresholdBasedOM;
 
-public class EDFlinkOperatorManagerFactory {
+public class HEDFlinkOperatorManagerFactory {
 
 
 	public static OperatorManager createOperatorManager(OperatorManagerType operatorManagerType, Operator operator) throws IllegalArgumentException {
@@ -11,7 +12,7 @@ public class EDFlinkOperatorManagerFactory {
 			case DO_NOTHING:
 				return new DoNothingOM(operator);
 			case THRESHOLD_BASED:
-				return new EDFlinkThresholdBasedOM(operator);
+				return new HEDFlinkThresholdBasedOM(operator);
 			case Q_LEARNING:
 				return new QLearningOM(operator);
 			case Q_LEARNING_PDS:

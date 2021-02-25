@@ -18,21 +18,16 @@
 
 package org.apache.flink.runtime.jobgraph;
 
-import it.uniroma2.dspsim.infrastructure.NodeType;
-import it.uniroma2.edf.EDFLogger;
-import it.uniroma2.edf.EDFlinkConfiguration;
-import it.uniroma2.edf.am.EDFlink;
+import it.uniroma2.edf.HEDFlinkConfiguration;
+import it.uniroma2.edf.HEDFlink;
 import org.apache.flink.api.common.ExecutionConfig;
 import org.apache.flink.api.common.InvalidProgramException;
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.cache.DistributedCache;
 import org.apache.flink.configuration.Configuration;
-import org.apache.flink.configuration.EDFOptions;
 import org.apache.flink.core.fs.Path;
 import org.apache.flink.runtime.blob.PermanentBlobKey;
-import org.apache.flink.runtime.clusterframework.types.AllocationID;
 import org.apache.flink.runtime.jobgraph.tasks.JobCheckpointingSettings;
-import org.apache.flink.shaded.netty4.io.netty.handler.logging.LogLevel;
 import org.apache.flink.util.InstantiationUtil;
 import org.apache.flink.util.SerializedValue;
 
@@ -40,7 +35,6 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.net.URL;
 import java.util.*;
-import java.util.concurrent.TimeUnit;
 
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
@@ -64,7 +58,7 @@ public class JobGraph implements Serializable {
 	/** List of task vertices included in this job graph. */
 	private final Map<JobVertexID, JobVertex> taskVertices = new LinkedHashMap<JobVertexID, JobVertex>();
 
-	//EDF
+	/*----HEDF desired resType list, specifies, for each JobGraph Vertex, resTypes its Tasks desire to be Scheduled with*/
 	private HashMap<JobVertexID, ArrayList<Integer>> taskResTypes = new HashMap<>();
 
 	/** The job configuration attached to this job. */
@@ -136,7 +130,7 @@ public class JobGraph implements Serializable {
 		this.jobName = jobName == null ? "(unnamed job)" : jobName;
 
 		//EDF
-		EDFlink.initialize();
+		HEDFlink.initialize();
 
 		try {
 			setExecutionConfig(new ExecutionConfig());
@@ -186,7 +180,7 @@ public class JobGraph implements Serializable {
 
 	// --------------------------------------------------------------------------------------------
 
-
+	//HEDF get to know desired resTypes and modify when there is a Scaling coming
 	public HashMap<JobVertexID, ArrayList<Integer>> getTaskResTypes() {
 		return taskResTypes;
 	}
@@ -303,18 +297,17 @@ public class JobGraph implements Serializable {
 	public void addVertex(JobVertex vertex) {
 		final JobVertexID id = vertex.getID();
 		JobVertex previous = taskVertices.put(id, vertex);
-		//EDF
+		//HEDF
 		//this list is filled, an entry for task, with the demanded starting resType
-		int startingType = EDFlinkConfiguration.getEDFlinkConfInstance().getInteger("node.types.starting", 1);
-		int nodeTypes = EDFlinkConfiguration.getEDFlinkConfInstance().getInteger("node.types.number", 3);
-		if (startingType >= nodeTypes)
+		int startingType = HEDFlinkConfiguration.getEDFlinkConfInstance().getInteger("node.types.starting", 1);
+		int nodeTypes = HEDFlinkConfiguration.getEDFlinkConfInstance().getInteger("node.types.number", 3);
+		if (startingType >= nodeTypes) //if the starting resType specified is bigger than max resType number specified, becomes max
 			startingType = nodeTypes - 1;
 		Integer[] arr = new Integer[vertex.getParallelism()];
-		//Arrays.fill(arr, 1);
 		Arrays.fill(arr, startingType);
 		ArrayList<Integer> resList = new ArrayList<>();
 		Collections.addAll(resList, arr);
-		taskResTypes.put(id, resList);
+		taskResTypes.put(id, resList); //desired resType list entry for this specific Vertex is initialized
 
 		// if we had a prior association, restore and throw an exception
 		if (previous != null) {

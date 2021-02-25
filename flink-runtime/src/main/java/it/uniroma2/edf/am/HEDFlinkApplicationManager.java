@@ -11,12 +11,11 @@ import it.uniroma2.dspsim.dsp.edf.om.OperatorManager;
 import it.uniroma2.dspsim.dsp.edf.om.request.OMRequest;
 import it.uniroma2.dspsim.infrastructure.ComputingInfrastructure;
 import it.uniroma2.dspsim.infrastructure.NodeType;
-import it.uniroma2.edf.EDFLogger;
-import it.uniroma2.edf.JobGraphUtils;
-import it.uniroma2.edf.am.execute.GlobalActuator;
-import it.uniroma2.edf.am.monitor.ApplicationMonitor;
-import it.uniroma2.edf.am.plan.ReconfigurationManager;
-import it.uniroma2.edf.metrics.EDFlinkStatistics;
+import it.uniroma2.edf.monitor.ApplicationMonitor;
+import it.uniroma2.edf.utils.EDFLogger;
+import it.uniroma2.edf.utils.JobGraphUtils;
+import it.uniroma2.edf.metrics.HEDFlinkStatistics;
+import it.uniroma2.edf.om.HEDFlinkOperatorManager;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.flink.api.common.time.Time;
 import org.apache.flink.configuration.Configuration;
@@ -36,13 +35,13 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicInteger;
 
 
-public class EDFlinkApplicationManager extends ApplicationManager implements Runnable {
+public class HEDFlinkApplicationManager extends ApplicationManager implements Runnable {
 
 	protected JobGraph jobGraph;
 	protected Dispatcher dispatcher;
 	protected Configuration config;
 	protected Map<Operator, OperatorManager> operatorManagers;
-	protected Map<Operator, EDFlinkOperatorManager> EDFlinkOperatorManagers;
+	protected Map<Operator, HEDFlinkOperatorManager> EDFlinkOperatorManagers;
 	protected HashMap<String, OperatorManager> perOperatorNameManagers;
 
 	//map of every Vertex associated with the resType list of the Slots in which they are actually scheduled
@@ -74,12 +73,12 @@ public class EDFlinkApplicationManager extends ApplicationManager implements Run
 
 	private double iterationCost;
 
-	private EDFlinkStatistics statistics;
+	private HEDFlinkStatistics statistics;
 
 
-	public EDFlinkApplicationManager(Configuration configuration, JobGraph jobGraph, Dispatcher dispatcher,
-									 Application application, Map<Operator, EDFlinkOperatorManager> operatorManagers,
-									 double sloLatency) {
+	public HEDFlinkApplicationManager(Configuration configuration, JobGraph jobGraph, Dispatcher dispatcher,
+									  Application application, Map<Operator, HEDFlinkOperatorManager> operatorManagers,
+									  double sloLatency) {
 		super(application, sloLatency);
 
 		config = configuration;
@@ -97,7 +96,7 @@ public class EDFlinkApplicationManager extends ApplicationManager implements Run
 		this.appMonitor = new ApplicationMonitor(jobGraph, configuration);
 		this.globalActuator = new GlobalActuator();
 		this.reconfManager = new ReconfigurationManager();
-		this.statistics = new EDFlinkStatistics();
+		this.statistics = new HEDFlinkStatistics();
 
 		//initializing deployedCounters around JobVertexes (not dependent by Source/Sink exclusion from App Operators)
 		for (JobVertex vertex: jobGraph.getVerticesSortedTopologicallyFromSources()) {
@@ -126,7 +125,7 @@ public class EDFlinkApplicationManager extends ApplicationManager implements Run
 
 	protected void initialize()
 	{
-		EDFLogger.log("EDFlinkAM: INITIALIZED!", LogLevel.INFO, EDFlinkApplicationManager.class);
+		EDFLogger.log("EDFlinkAM: INITIALIZED!", LogLevel.INFO, HEDFlinkApplicationManager.class);
 	}
 
 	@Override
@@ -143,16 +142,16 @@ public class EDFlinkApplicationManager extends ApplicationManager implements Run
 
 			CompletableFuture<JobStatus> jobStatusFuture = dispatcher.requestJobStatus(jobGraph.getJobID(), Time.seconds(3));
 			try {
-				EDFLogger.log("AM: GETTING JOB STATUS!", LogLevel.INFO, EDFlinkApplicationManager.class);
+				EDFLogger.log("AM: GETTING JOB STATUS!", LogLevel.INFO, HEDFlinkApplicationManager.class);
 				JobStatus jobStatus = jobStatusFuture.get();
 				if (jobStatus == JobStatus.FAILED || jobStatus == JobStatus.CANCELED || jobStatus == JobStatus.CANCELLING) {
-					EDFLogger.log("AM: CLOSING", LogLevel.INFO, EDFlinkApplicationManager.class);
+					EDFLogger.log("AM: CLOSING", LogLevel.INFO, HEDFlinkApplicationManager.class);
 					close();
 					return;
 				} else if (jobStatus == JobStatus.FINISHED) {
-					EDFLogger.log("AM: JOB FINISHED", LogLevel.INFO, EDFlinkApplicationManager.class);
+					EDFLogger.log("AM: JOB FINISHED", LogLevel.INFO, HEDFlinkApplicationManager.class);
 				} else if (jobStatus != JobStatus.RUNNING) {
-					EDFLogger.log("AM: Job Not Running... AM inhibited", LogLevel.INFO, EDFlinkApplicationManager.class);
+					EDFLogger.log("AM: Job Not Running... AM inhibited", LogLevel.INFO, HEDFlinkApplicationManager.class);
 					continue;
 				}
 			} catch (InterruptedException e) {
@@ -163,9 +162,9 @@ public class EDFlinkApplicationManager extends ApplicationManager implements Run
 
 			//round = (round + 1) % roundsBetweenPlanning;
 			round = (round + 1);
-			EDFLogger.log("AM: Round " + round, LogLevel.INFO, EDFlinkApplicationManager.class);
+			EDFLogger.log("AM: Round " + round, LogLevel.INFO, HEDFlinkApplicationManager.class);
 
-			double endToEndLatency = monitor2();//use AppMonitor
+			double endToEndLatency = monitor();//use AppMonitor
 
 			if ((round % roundsBetweenPlanning) == 0) {
 				iterationCost = 0.0;
@@ -177,7 +176,7 @@ public class EDFlinkApplicationManager extends ApplicationManager implements Run
 				/*
 				this.reconfRequests = reconfRequests;
 				reconfRequests.forEach((op,req) -> EDFLogger.log("EDF: PLAN - reconfigurations : "+req.toString(),
-					LogLevel.INFO, EDFlinkApplicationManager.class)); //print requests taken
+					LogLevel.INFO, HEDFlinkApplicationManager.class)); //print requests taken
 
 				 */
 				/*
@@ -187,7 +186,7 @@ public class EDFlinkApplicationManager extends ApplicationManager implements Run
 				}
 
 				 */
-				//EDFLogger.log("AM: NOTIFIED", LogLevel.INFO, EDFlinkApplicationManager.class);
+				//EDFLogger.log("AM: NOTIFIED", LogLevel.INFO, HEDFlinkApplicationManager.class);
 				execute(reconfRequests);
 
 				if (isReconfigured) {
@@ -211,67 +210,13 @@ public class EDFlinkApplicationManager extends ApplicationManager implements Run
 
 	protected void startOperatorManagers(){
 		this.perOperatorNameManagers = new HashMap<>();
-		for (Map.Entry<Operator, EDFlinkOperatorManager> om: EDFlinkOperatorManagers.entrySet()) {
+		for (Map.Entry<Operator, HEDFlinkOperatorManager> om: EDFlinkOperatorManagers.entrySet()) {
 			new Thread(om.getValue()).start();
 			this.perOperatorNameManagers.put(om.getKey().getName(), om.getValue().getWrappedOM());
 		}
 	}
 
 	protected double monitor() {
-		double endToEndLatency = 0.0;
-		for (JobVertex vertex: jobGraph.getVerticesSortedTopologicallyFromSources()){
-			ArrayList<Integer> resTypes = vertex.getDeployedSlotsResTypes();
-			int i=1;
-			for (int resType: resTypes)
-				EDFLogger.log("EDF: Vertex "+ vertex.getName()+" Subtask "+ i+ " deployedResType " + resType,
-					LogLevel.INFO, EDFlinkApplicationManager.class);
-		}
-
-		EDFLogger.log("Numero di vertici: "+jobGraph.getNumberOfVertices(), LogLevel.INFO, EDFlinkApplicationManager.class);
-		EDFLogger.log("Lista di vertici: "+jobGraph.getVertices(), LogLevel.INFO, EDFlinkApplicationManager.class);
-
-		//jobGraph.getVertices().forEach(jobVertex -> LOG.info("operatorids " + jobVertex.getOperatorIDs()));
-		//jobGraph.getVertices().forEach(jobVertex -> LOG.info("vertexname " + jobVertex.getName()));
-		//jobGraph.getVertices().forEach(jobVertex -> LOG.info("vertexid " + jobVertex.getID()));
-		//jobGraph.getVertices().forEach(jobVertex -> LOG.info("vertextostring " + jobVertex.toString()));
-		JobGraphUtils.listUpstreamOperators(jobGraph, jobGraph.getVerticesAsArray()[1]).forEach(
-			jobVertex -> EDFLogger.log("upstreamtostirng "+jobVertex.toString(), LogLevel.INFO, EDFlinkApplicationManager.class));
-		//double ir = appMonitor.getSubtaskInputRate(JobGraphUtils.listOperators(jobGraph, true,true).iterator().next().getOperatorName(),String.valueOf(0));
-		if (appMonitor != null) {
-			JobVertex vertex = jobGraph.getVerticesSortedTopologicallyFromSources().get(1);
-			/*
-			double ir = appMonitor.getSubtaskInputRate(jobGraph.getVerticesAsArray()[1].getName(), String.valueOf(0));
-			EDFLogger.log("EDF: Input Rate: " + ir, LogLevel.INFO, ApplicationManager.class);
-			double operatorIr = appMonitor.getOperatorInputRate(jobGraph.getVerticesAsArray()[1].getName());
-			double appIr = appMonitor.getApplicationInputRate();
-			double operatorLatency = appMonitor.getAvgLatencyUpToOperator(jobGraph.getVerticesAsArray()[1]);
-			double avgOperatorLatency = appMonitor.getAvgOperatorLatency(jobGraph.getVerticesAsArray()[1]);
-			double processingTime = appMonitor.getAvgOperatorProcessingTime(jobGraph.getVerticesAsArray()[1].getName());
-
-			 */
-			double ir = appMonitor.getSubtaskInputRate(vertex.getName(), String.valueOf(0));
-			EDFLogger.log("EDF: Input Rate: " + ir, LogLevel.INFO, it.uniroma2.edf.am.ApplicationManager.class);
-			double operatorIr = appMonitor.getOperatorInputRate(vertex.getName(), vertex.getParallelism());
-			//double appIr = appMonitor.getApplicationInputRate();
-			double operatorLatency = appMonitor.getAvgLatencyUpToOperator(vertex);
-			double avgOperatorLatency = appMonitor.getAvgOperatorLatency(vertex);
-			//double processingTime = appMonitor.getAvgOperatorProcessingTime(vertex.getName());
-			EDFLogger.log("EDF: operator Input Rate: " + operatorIr, LogLevel.INFO, it.uniroma2.edf.am.ApplicationManager.class);
-			//EDFLogger.log("EDF: application Input Rate: " + appIr, LogLevel.INFO, it.uniroma2.edf.am.ApplicationManager.class);
-			EDFLogger.log("EDF: operatorLatency: " + operatorLatency, LogLevel.INFO, it.uniroma2.edf.am.ApplicationManager.class);
-			EDFLogger.log("EDF: avgOperatorLatency: " + avgOperatorLatency, LogLevel.INFO, it.uniroma2.edf.am.ApplicationManager.class);
-			//EDFLogger.log("EDF: processingTime: " + processingTime, LogLevel.INFO, it.uniroma2.edf.am.ApplicationManager.class);
-			//EDFLogger.log("EDF: avgLatency + processingTime: " + (processingTime+avgOperatorLatency), LogLevel.INFO, it.uniroma2.edf.am.ApplicationManager.class);
-
-			//Latencies print for experimentation
-			endToEndLatency = appMonitor.endToEndLatency();
-			EDFLogger.log("EDF: Simulation-Like EndToEndLatency: " + endToEndLatency,
-				LogLevel.INFO, it.uniroma2.edf.am.ApplicationManager.class);
-		}
-		return endToEndLatency;
-	}
-
-	protected double monitor2() {
 		//Latencies print for experimentation
 		double endToEndLatency = appMonitor.endToEndLatency() / 1000;
 		EDFLogger.log("EDF: Simulation-Like EndToEndLatency: " + endToEndLatency,
@@ -301,7 +246,7 @@ public class EDFlinkApplicationManager extends ApplicationManager implements Run
 
 	//(not dependent by Source/Sink exclusion from App Operators)
 	protected void analyze(double endToEndLatency) {
-		EDFLogger.log("AM: ANALYZE - parallelism: " +jobGraph.getVerticesAsArray()[1].getParallelism(), LogLevel.INFO, EDFlinkApplicationManager.class);
+		EDFLogger.log("AM: ANALYZE - parallelism: " +jobGraph.getVerticesAsArray()[1].getParallelism(), LogLevel.INFO, HEDFlinkApplicationManager.class);
 		//LOG.info("ANALYZE - parallelism: " +jobGraph.getVerticesAsArray()[2].getParallelism());
 		boolean sloViolated = false;
 		if (endToEndLatency > LATENCY_SLO) {
@@ -314,7 +259,7 @@ public class EDFlinkApplicationManager extends ApplicationManager implements Run
 		double cRes = (deploymentCost / application.computeMaxDeploymentCost());
 		iterationCost += cRes * this.wRes;
 		EDFLogger.log("EDF: ANALYZE - Latency SLO violation: "+sloViolated+", deployment cost: "+deploymentCost,
-			LogLevel.INFO, EDFlinkApplicationManager.class);
+			LogLevel.INFO, HEDFlinkApplicationManager.class);
 	}
 
 	//ACCEPT ALL REQUESTS
@@ -324,7 +269,7 @@ public class EDFlinkApplicationManager extends ApplicationManager implements Run
 		Map<Operator, Reconfiguration> acceptedRequests = reconfManager.acceptRequests(requests);
 		reconfRequests = acceptedRequests;
 		reconfRequests.forEach((op,req) -> EDFLogger.log("EDF: PLAN - reconfigurations : "+req.toString(),
-			LogLevel.INFO, EDFlinkApplicationManager.class)); //print requests taken
+			LogLevel.INFO, HEDFlinkApplicationManager.class)); //print requests taken
 		if (!acceptedRequests.isEmpty())
 			reconfManager.fillDesiredSchedulingReconf(acceptedRequests, jobGraph, request, perOperatorNameID);
 		return acceptedRequests;
@@ -333,7 +278,7 @@ public class EDFlinkApplicationManager extends ApplicationManager implements Run
 	protected long execute(Map<Operator, Reconfiguration> reconfigurations){
 		long start = System.currentTimeMillis();
 		if (reconfigurations.isEmpty()){
-			EDFLogger.log("EDF: EXECUTE - no reconf, skipping execution", LogLevel.INFO, EDFlinkApplicationManager.class);
+			EDFLogger.log("EDF: EXECUTE - no reconf, skipping execution", LogLevel.INFO, HEDFlinkApplicationManager.class);
 			isReconfigured = false;
 			for (JobVertex vertex: JobGraphUtils.listSortedTopologicallyOperators(jobGraph, true, true)) {
 				Operator op = perOperatorNameManagers.get(vertex.getName()).getOperator();
@@ -365,13 +310,13 @@ public class EDFlinkApplicationManager extends ApplicationManager implements Run
 			ArrayList<Integer> desiredResTypes = overallDesResTypes.get(vertex.getID());
 			EDFLogger.log("EDF: EXECUTE Reconfigure - la Riconfigurazione desiderata per il Vertex "+vertex.getName()+
 				"è "+ desiredResTypes.toString()+" mentre quella effettuata è "+actualResTypes.toString(), LogLevel.INFO,
-				EDFlinkApplicationManager.class);
+				HEDFlinkApplicationManager.class);
 
 			if (CollectionUtils.subtract(new ArrayList<>(desiredResTypes), actualResTypes).isEmpty()) {
-				EDFLogger.log("EDF: la riconfigurazione del vertex " + vertex.getName() + " desiderata è stata applicata", LogLevel.INFO, EDFlinkApplicationManager.class);
+				EDFLogger.log("EDF: la riconfigurazione del vertex " + vertex.getName() + " desiderata è stata applicata", LogLevel.INFO, HEDFlinkApplicationManager.class);
 				statistics.updateDesOpReconf(1);
 			} else {
-				EDFLogger.log("EDF: la riconfigurazione del vertex " + vertex.getName() + " desiderata NON stata applicata", LogLevel.INFO, EDFlinkApplicationManager.class);
+				EDFLogger.log("EDF: la riconfigurazione del vertex " + vertex.getName() + " desiderata NON stata applicata", LogLevel.INFO, HEDFlinkApplicationManager.class);
 				desReconf = false;
 				misconfigurationStats(vertex);
 			}
@@ -392,13 +337,13 @@ public class EDFlinkApplicationManager extends ApplicationManager implements Run
 			//updating current deployed res types for this vertex
 			currentDeployedSlotsResTypes.put(vertex.getID(), new ArrayList<>(actualResTypes));
 			EDFLogger.log("EDF: EXECUTE - Lista dei NodeTypes riconfigurati per Operator "+currOperator.getName()
-				+": "+ Arrays.toString(currOperator.getCurrentDeployment()), LogLevel.INFO, EDFlinkApplicationManager.class);
+				+": "+ Arrays.toString(currOperator.getCurrentDeployment()), LogLevel.INFO, HEDFlinkApplicationManager.class);
 		}
 		//update desired for actual. No deployment order should change in already existing subtasks
 		jobGraph.setTaskResTypes(new HashMap<>(currentDeployedSlotsResTypes));
 		/*
 		EDFLogger.log("EDF: EXECUTE - Lista dei resTypes desiderati per il giro successivo: "+jobGraph.getTaskResTypes().toString(),
-			LogLevel.INFO, EDFlinkApplicationManager.class);
+			LogLevel.INFO, HEDFlinkApplicationManager.class);
 		 */
 		if (desReconf) statistics.updateDesReconf(1);
 	}
@@ -406,7 +351,7 @@ public class EDFlinkApplicationManager extends ApplicationManager implements Run
 	//RICAVA LE RICHIESTE DAGLI EDFLINKOM
 	protected HashMap<OperatorManager, OMRequest> pickOMRequests(){
 		HashMap<OperatorManager, OMRequest> omRequests = new HashMap<>();
-		for (Map.Entry<Operator, EDFlinkOperatorManager> entry : EDFlinkOperatorManagers.entrySet()){
+		for (Map.Entry<Operator, HEDFlinkOperatorManager> entry : EDFlinkOperatorManagers.entrySet()){
 			OMRequest request = entry.getValue().getReconfRequest();
 			omRequests.put(entry.getValue().getWrappedOM(), request);
 		}
@@ -420,7 +365,7 @@ public class EDFlinkApplicationManager extends ApplicationManager implements Run
 					deployedCounter.wait();
 				} catch (InterruptedException e) {
 					Thread.currentThread().interrupt();
-					EDFLogger.log("Thread interrupted " + e.getMessage(), LogLevel.ERROR, EDFlinkApplicationManager.class);
+					EDFLogger.log("Thread interrupted " + e.getMessage(), LogLevel.ERROR, HEDFlinkApplicationManager.class);
 				}
 			}
 		}
@@ -446,7 +391,7 @@ public class EDFlinkApplicationManager extends ApplicationManager implements Run
 
 	protected void close()
 	{
-		EDFLogger.log("AM: closed", LogLevel.INFO, EDFlinkApplicationManager.class);
+		EDFLogger.log("AM: closed", LogLevel.INFO, HEDFlinkApplicationManager.class);
 		appMonitor.close();
 	}
 }

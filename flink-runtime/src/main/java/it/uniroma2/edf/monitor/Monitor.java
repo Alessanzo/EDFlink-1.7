@@ -1,9 +1,9 @@
-package it.uniroma2.edf.am.monitor;
+package it.uniroma2.edf.monitor;
 
 import it.uniroma2.dspsim.ConfigurationKeys;
 import it.uniroma2.dspsim.dsp.Operator;
-import it.uniroma2.edf.EDFLogger;
-import it.uniroma2.edf.JobGraphUtils;
+import it.uniroma2.edf.utils.EDFLogger;
+import it.uniroma2.edf.utils.JobGraphUtils;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.EDFOptions;
 import org.apache.flink.runtime.jobgraph.JobGraph;
@@ -20,43 +20,25 @@ import static redis.clients.jedis.ScanParams.SCAN_POINTER_START;
 
 public class Monitor {
 
-	static private final Logger log = LoggerFactory.getLogger(ApplicationMonitorOld.class);
+	static private final Logger log = LoggerFactory.getLogger(Monitor.class);
 
 	protected JobGraph jobGraph;
-	protected List<JobVertex> sources, sinks;
-	private boolean detailedLatencyLogging;
 
-	private boolean publishOnRedis;
-	private boolean logEverything = false;
 	private Jedis jedis = null;
 	private JedisPool jedisPool = null;
 
 	// must be provided as metrics.reporter.<reporter name>.redishost: ....
-	static private final String CONF_REDIS_HOST2 = "metrics.reporter.redisreporter.redishost";
-	static private final String CONF_REDIS_PORT2 = "metrics.reporter.redisreporter.redisport";
-	static private final String CONF_REDIS_HOST = "redishost";
-	static private final String CONF_REDIS_PORT = "redisport";
-	static private final String CONF_LOG_EVERYTHING = "logeverything";
-
-
+	static private final String CONF_REDIS_HOST = "metrics.reporter.redisreporter.redishost";
+	static private final String CONF_REDIS_PORT = "metrics.reporter.redisreporter.redisport";
 
 
 
 	public Monitor(JobGraph jobGraph, Configuration configuration)
 	{
 		this.jobGraph = jobGraph;
-		this.sources = JobGraphUtils.listSources(jobGraph);
-		this.sinks = JobGraphUtils.listSinks(jobGraph);
 
-		log.info("Sources: {}", sources);
-		log.info("Sinks: {}", sinks);
-		log.info("Paths: {}", JobGraphUtils.listSourceSinkPaths(jobGraph));
-
-		for (JobVertex jv : jobGraph.getVertices()) {
-			log.info("id2name: {} -> {}", jv.getID().toString(), jv.getName());
-		}
-		String redisHostname = configuration.getString(CONF_REDIS_HOST2, "");
-		int redisPort = configuration.getInteger(CONF_REDIS_PORT2, 6379);
+		String redisHostname = configuration.getString(CONF_REDIS_HOST, "");
+		int redisPort = configuration.getInteger(CONF_REDIS_PORT, 6379);
 		jedis = new Jedis(redisHostname, redisPort);
 
 		JedisPoolConfig poolConfig = new JedisPoolConfig();
@@ -66,20 +48,8 @@ public class Monitor {
 			redisHostname,
 			redisPort);
 
-		//jedis = new Jedis("ec2-3-128-94-177.us-east-2.compute.amazonaws.com", 6379);
-		publishOnRedis = true;
-		/*
-		String redisHostname = configuration.getString(CONF_REDIS_HOST, "");
-		publishOnRedis = !redisHostname.isEmpty();
-		if (publishOnRedis) {
-			int redisPort = configuration.getInteger(CONF_REDIS_PORT, 6379);
-			jedis = new Jedis(redisHostname, 6379);
-		}
-*/
-		logEverything = configuration.getBoolean(CONF_LOG_EVERYTHING, false);
-
-		detailedLatencyLogging = configuration.getBoolean(EDFOptions.EDF_AM_DETAILED_LATENCY_LOGGING);
 	}
+
 
 	public void close()
 	{
@@ -294,7 +264,7 @@ public class Monitor {
 				if (metricSubtask < numSubtask) {
 					String value = jedis.get(singleKey);
 					double latency = Double.parseDouble(value);
-					EDFLogger.log("EDF: Latency key: "+ singleKey + "Latency value: " + value + " Subtask: " + fields[3], LogLevel.INFO, ApplicationMonitorOld.class);
+					//EDFLogger.log("EDF: Latency key: "+ singleKey + "Latency value: " + value + " Subtask: " + fields[3], LogLevel.INFO, Monitor.class);
 					Double[] subtaskLatencySum = subtaskLatencies.get(metricSubtask);
 					//include this (sub)source-subtask latency value to subtask latency mean only if it is not 0
 					if (latency != 0.0) {
@@ -320,20 +290,18 @@ public class Monitor {
 
 
 	public double getAvgOperatorLatency (JobVertex operator) {
-		/* QT(op) = max_subtask(QT(op,subtask)) - max_upstream(latency_up_to(upstream) */
 		double max_up_to_me = getAvgLatencyUpToOperator(operator);
 
 		/* Find max latency up to upstream operators */
 		double max_up_to_upstream = 0.0;
 		Set<JobVertex> upstreamOperators = JobGraphUtils.listUpstreamOperators(jobGraph, operator);
 		for (JobVertex upstream : upstreamOperators) {
-			EDFLogger.log("EDF: Operator " + operator.getName() + " upstream operator is " + upstream.getName() +
-				" with latency " + getAvgLatencyUpToOperator(upstream), LogLevel.INFO, ApplicationMonitorOld.class);
+			//EDFLogger.log("EDF: Operator " + operator.getName() + " upstream operator is " + upstream.getName() +
+			//	" with latency " + getAvgLatencyUpToOperator(upstream), LogLevel.INFO, Monitor.class);
 			max_up_to_upstream = max(max_up_to_upstream, getAvgLatencyUpToOperator(upstream));
 		}
-
+		//it happens working with latency means, but is irrelevant
 		if (max_up_to_me < max_up_to_upstream) {
-			log.error("latency up to {} is less than to upstreams! {}, {}", operator, max_up_to_me, max_up_to_upstream);
 			return 0.0;
 		}
 

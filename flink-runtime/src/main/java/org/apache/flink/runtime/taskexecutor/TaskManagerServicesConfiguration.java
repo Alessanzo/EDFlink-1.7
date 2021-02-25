@@ -19,7 +19,7 @@
 package org.apache.flink.runtime.taskexecutor;
 
 import it.uniroma2.dspsim.ConfigurationKeys;
-import it.uniroma2.edf.EDFLogger;
+import it.uniroma2.edf.utils.EDFLogger;
 import org.apache.flink.api.common.time.Time;
 import org.apache.flink.configuration.*;
 import org.apache.flink.core.memory.MemoryType;
@@ -216,7 +216,7 @@ public class TaskManagerServicesConfiguration {
 			boolean localCommunication) throws Exception {
 
 
-
+		/*HEDF resType Information*/
 		String[] slotTypes;
 		if (!configuration.getBoolean(EDFOptions.SLOT_GRANULARITY_RES_TYPE)){
 			/*Each Slot inherits its TaskManager resType*/
@@ -228,9 +228,9 @@ public class TaskManagerServicesConfiguration {
 
 			slotTypes = new String[]{String.valueOf(globalResType)};
 		}
-		//Slot Granularity ResType is not supported by EDFlink MAPE Cycle (works with scheduling)
+		//Slot Granularity ResType is not supported by HEDFlink MAPE Cycle (works with scheduling)
 		else{
-			EDFLogger.log("EDF: WARNING - EDFLINK MAPE DOESN'T SUPPORT SLOT GRANULARITY," +
+			EDFLogger.log("HEDF: WARNING - EDFLINK MAPE DOESN'T SUPPORT SLOT GRANULARITY," +
 					" ONLY WORKS WITH TASKMANAGER GRANULARITY RESTYPES",
 				LogLevel.WARN, TaskManagerServicesConfiguration.class);
 

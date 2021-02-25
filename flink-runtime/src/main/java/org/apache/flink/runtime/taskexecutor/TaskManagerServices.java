@@ -18,7 +18,7 @@
 
 package org.apache.flink.runtime.taskexecutor;
 
-import it.uniroma2.edf.EDFLogger;
+import it.uniroma2.edf.utils.EDFLogger;
 import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.IllegalConfigurationException;
@@ -232,16 +232,19 @@ public class TaskManagerServices {
 		final NetworkEnvironment network = createNetworkEnvironment(taskManagerServicesConfiguration, maxJvmHeapMemory);
 		network.start();
 
-		//EDF
-		//resourceProfiles to associate with every single Taskmanager Slot, for candidate Slot matching purposes during scheduling
+
+		/*---------HEDF resType association with each TaskSlot-----*/
+
+		//ResourceProfiles to associate with every single Taskmanager Slot, for candidate Slot matching purposes during scheduling
 		final List<ResourceProfile> resourceProfiles = new ArrayList<>(taskManagerServicesConfiguration.getNumberOfSlots());
 
 		int restype = -1;
 		for (int i = 0; i < taskManagerServicesConfiguration.getNumberOfSlots(); i++) {
-			//se c'è un solo elemento, o c'è un solo taskSlot, o tutti devono avere la stessa Risorsa
+			//if there is a single element in the List, that is the TaskManager resType to be shared by all their TaskSlots
 			if (taskManagerServicesConfiguration.getSlotTypes().length == 1){
 				restype = Integer.parseInt(taskManagerServicesConfiguration.getSlotTypes()[0]);
 			}
+			//each Slot has its resType (Slot granularity Scenario)
 			else{
 				if (taskManagerServicesConfiguration.getSlotTypes().length < taskManagerServicesConfiguration.getNumberOfSlots())
 					throw new FlinkException("Slot Types Number must not be shorter than Slot Number");
@@ -250,14 +253,15 @@ public class TaskManagerServices {
 			resourceProfiles.add(i, ResourceProfile.getAny(restype));
 		}
 
-		EDFLogger.log("EDF: La TaskManagerLocation di questo TaskManager è: "+ restype,
+		//TaskManager gets the first resType of the list to be associated with its TaskManagerLocation, even if there are more
+		EDFLogger.log("HEDF: This TaskManager TaskManagerLocation is: "+ restype,
 			LogLevel.INFO, TaskManagerServices.class);
 
 		final TaskManagerLocation taskManagerLocation = new TaskManagerLocation(
 			resourceID,
 			taskManagerServicesConfiguration.getTaskManagerAddress(),
 			network.getConnectionManager().getDataPort(),
-			restype); //EDF
+			restype); //HEDF
 
 		// this call has to happen strictly after the network stack has been initialized
 		final MemoryManager memoryManager = createMemoryManager(taskManagerServicesConfiguration, freeHeapMemoryWithDefrag, maxJvmHeapMemory);
@@ -270,7 +274,7 @@ public class TaskManagerServices {
 		final TimerService<AllocationID> timerService = new TimerService<>(
 			new ScheduledThreadPoolExecutor(1),
 			taskManagerServicesConfiguration.getTimerServiceShutdownTimeout());
-
+		//HEDF resType association with each TaskSlot
 		final TaskSlotTable taskSlotTable = new TaskSlotTable(resourceProfiles, timerService);
 
 		final JobManagerTable jobManagerTable = new JobManagerTable();

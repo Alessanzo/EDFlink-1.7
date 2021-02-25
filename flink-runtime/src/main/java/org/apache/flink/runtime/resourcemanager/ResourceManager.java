@@ -186,7 +186,7 @@ public abstract class ResourceManager<WorkerType extends ResourceIDRetrievable>
 		this.taskExecutorGatewayFutures = new HashMap<>(8);
 	}
 
-	//EDF
+	/*HEDF query method to let SlotPool know about the presence of an exactly matching TaskSlot managed by ResourceManager*/
 	@Override
 	public boolean isResTypeSlotAvailable(SlotProfile slotProfile){
 		return slotManager.strictMatchSlotResType(slotProfile);

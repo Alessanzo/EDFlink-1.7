@@ -1,28 +1,21 @@
-package it.uniroma2.edf.am;
+package it.uniroma2.edf.om;
 
 import it.uniroma2.dspsim.dsp.Operator;
 import it.uniroma2.dspsim.dsp.queueing.OperatorQueueModel;
-import it.uniroma2.edf.EDFLogger;
-import it.uniroma2.edf.am.monitor.ApplicationMonitorOld;
-import it.uniroma2.edf.am.monitor.OperatorMonitor;
+import it.uniroma2.edf.utils.EDFLogger;
+import it.uniroma2.edf.monitor.ApplicationMonitorOld;
+import it.uniroma2.edf.monitor.OperatorMonitor;
 import org.apache.flink.runtime.jobgraph.JobVertex;
 import org.apache.flink.shaded.netty4.io.netty.handler.logging.LogLevel;
 
-public class EDFlinkOperator extends Operator {
+public class HEDFlinkOperator extends Operator {
 
 	protected ApplicationMonitorOld appMonitor;
 	protected OperatorMonitor opMonitor;
 	protected JobVertex vertex;
 
-	public EDFlinkOperator(ApplicationMonitorOld appMonitor, JobVertex jobVertex, String name,
-						   OperatorQueueModel queueModel, int maxParallelism) {
-		super(name, queueModel, maxParallelism);
-		this.appMonitor = appMonitor;
-		this.vertex = jobVertex;
-	}
-
-	public EDFlinkOperator( JobVertex jobVertex, String name,
-						   OperatorQueueModel queueModel, int maxParallelism) {
+	public HEDFlinkOperator(JobVertex jobVertex, String name,
+							OperatorQueueModel queueModel, int maxParallelism) {
 		super(name, queueModel, maxParallelism);
 		this.vertex = jobVertex;
 	}
@@ -39,7 +32,7 @@ public class EDFlinkOperator extends Operator {
 		double procTime = opMonitor.getAvgOperatorProcessingTime(vertex);
 		double opRespTime = (operatorLatency+procTime) / 1000;
 		EDFLogger.log("EDF: metodo overridden invocato. Latenza operatore: "+ opRespTime
-			+", SLO operatore: "+getSloRespTime(), LogLevel.INFO, EDFlinkOperator.class);
+			+", SLO operatore: "+getSloRespTime(), LogLevel.INFO, HEDFlinkOperator.class);
 		return opRespTime;
 	}
 }
