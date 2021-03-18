@@ -10,6 +10,8 @@ import org.apache.flink.shaded.netty4.io.netty.handler.logging.LogLevel;
 
 import java.util.List;
 
+/*Class that extends Monitor and implements methods for HEDFlinkAM to retrieve end-to-end latency
+* */
 public class ApplicationMonitor extends Monitor {
 
 	protected List<JobVertex> sources, sinks;
@@ -27,7 +29,8 @@ public class ApplicationMonitor extends Monitor {
 		EDFLogger.log("Paths:"+ paths, LogLevel.INFO, ApplicationMonitor.class);
 	}
 
-	//ESCLUDO SORGENTE E SINK DALLE LATENZE SUL PERCORSO
+	//calculate processing latency exluding sources and sinks, summing all operators queue times (flik latencies) and
+	//processing times
 	public double endToEndLatency() {
 		double latency = 0.0;
 		for(List<JobVertex> path: paths){

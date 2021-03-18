@@ -5,6 +5,8 @@ import it.uniroma2.edf.monitor.Monitor;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.runtime.jobgraph.JobGraph;
 
+/*Class that extends Monitor and implements a method for collecting EDFlinkOM required metrics in
+* OMMonitoringInfo*/
 public class OperatorMonitor extends Monitor {
 	public OperatorMonitor(JobGraph jobGraph, Configuration configuration) {
 		super(jobGraph, configuration);

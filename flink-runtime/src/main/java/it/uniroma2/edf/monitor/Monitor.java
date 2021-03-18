@@ -17,7 +17,8 @@ import java.util.*;
 
 import static java.lang.Double.max;
 import static redis.clients.jedis.ScanParams.SCAN_POINTER_START;
-
+/*Monitoring class that implements all the basic methods to retrieve metrics, used by both HEDFlinkAM and HEDFlinkOM.
+ * */
 public class Monitor {
 
 	static private final Logger log = LoggerFactory.getLogger(Monitor.class);
@@ -40,6 +41,7 @@ public class Monitor {
 		String redisHostname = configuration.getString(CONF_REDIS_HOST, "");
 		int redisPort = configuration.getInteger(CONF_REDIS_PORT, 6379);
 		jedis = new Jedis(redisHostname, redisPort);
+		//one connection per object is enough because every HEDFlink AM and OM has its own (App/Op) monitor
 
 		JedisPoolConfig poolConfig = new JedisPoolConfig();
 		poolConfig.setMaxTotal(128);
@@ -60,6 +62,7 @@ public class Monitor {
 		return jedisPool.getResource();
 	}
 
+	//retrieve Operator input rate and CPU usage aggregating data for each subtask in use
 	public Double[] getOperatorIRandUsage(String operatorName, int currentParallelism) {
 		double operatorInputRate = 0;
 		double operatorCpuUsage = 0;
@@ -92,14 +95,7 @@ public class Monitor {
 	}
 
 
-	public double getSubtaskInputRate(String operator, String subtaskId) {
-		String key = String.format("inputRate.%s.%s.%s", jobGraph.getName(), operator, subtaskId);
-		log.info("key: " + key);
-		String res = jedis.get(key);
-		if(res == null) return -1;
-		return Double.parseDouble(res);
-	}
-
+	//get subtasks input rate list of a specific operator
 	public ArrayList<Double> getSubtaskInputRates(String operator, int parallelism){
 		ArrayList<Double> subtaskInputRates = new ArrayList<>();
 		//Jedis jedis = jedisPool.getResource();
@@ -144,29 +140,6 @@ public class Monitor {
 		return inputRatesSum;
 	}
 
-	public double getOperatorInputRate(String operator, int parallelism) {
-		Jedis jedis = jedisPool.getResource();
-		String key = String.format("inputRate.%s.%s.*", jobGraph.getName(), operator);
-		ScanParams scanParams = new ScanParams().match(key);
-		String cur = SCAN_POINTER_START;
-		double inputRatesSum = 0.0;
-		do {
-			ScanResult<String> scanResult = jedis.scan(cur, scanParams);
-			// work with result
-			for (String singleKey: scanResult.getResult()){
-				int subtaskIndex = Integer.parseInt(singleKey.split("\\.")[3]);
-
-				if (subtaskIndex < parallelism) {
-					String value = jedis.get(singleKey);
-					inputRatesSum += Double.parseDouble(value);
-				}
-			}
-			cur = scanResult.getCursor();
-		} while (!cur.equals(SCAN_POINTER_START));
-		//jedis.close();
-		return inputRatesSum;
-	}
-
 	public Map<Operator, Double> getOperatorsInputRate(List<Operator> operators){
 		HashMap<Operator, Double> perOperatorInputRates = new HashMap<>();
 		List<JobVertex> vertices = jobGraph.getVerticesSortedTopologicallyFromSources();
@@ -183,6 +156,7 @@ public class Monitor {
 		return perOperatorInputRates;
 	}
 
+	//retrieve subtask cpu usage list
 	public ArrayList<Double> getSubtaskCpuUsages (String operator, int parallelism) {
 		ArrayList<Double> subtaskCpuUsages = new ArrayList<>();
 		//Jedis jedis = jedisPool.getResource();
@@ -208,6 +182,7 @@ public class Monitor {
 		return subtaskCpuUsages;
 	}
 
+	//retrieve average operator proc time combining subtask in use
 	public double getAvgOperatorProcessingTime (JobVertex vertex) {
 		//Jedis jedis = jedisPool.getResource();
 		String key = String.format("executionTime.%s.%s.*", jobGraph.getName(), vertex.getName());
@@ -237,11 +212,10 @@ public class Monitor {
 	}
 
 
-	//calculate Avg Operator Latency only between subTask that received at least one tuple (= latency is not 0)
+	//calculate Avg flink Latency up to operator which consists of the sum of the mean queue times up to operator
 	public double getAvgLatencyUpToOperator (JobVertex operator)
 	{
-		//Jedis jedis = getPoolConnection(); //ADD
-		//Jedis jedis = this.jedisPool.getResource();
+
 		double operatorLatencySum = 0.0;
 		int numSubtask = operator.getParallelism();
 		int subtaskThatReceivedAny = 0;
@@ -288,7 +262,7 @@ public class Monitor {
 		else return 0.0;
 	}
 
-
+	//get flink latency for an operator, which corresponds to its queue time
 	public double getAvgOperatorLatency (JobVertex operator) {
 		double max_up_to_me = getAvgLatencyUpToOperator(operator);
 

@@ -4,6 +4,7 @@ import it.uniroma2.dspsim.dsp.Operator;
 import it.uniroma2.dspsim.dsp.edf.om.*;
 import it.uniroma2.edf.om.HEDFlinkThresholdBasedOM;
 
+/*New OperatorManagerFactory that adds the new HEDFlinkThresholdBasedOM with respect to old OMFactory from Simulator*/
 public class HEDFlinkOperatorManagerFactory {
 
 

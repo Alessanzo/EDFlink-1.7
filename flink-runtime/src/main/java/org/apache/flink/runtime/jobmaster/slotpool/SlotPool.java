@@ -638,7 +638,7 @@ public class SlotPool extends RpcEndpoint implements SlotPoolGateway, AllocatedS
 		Time allocationTimeout) throws NoResourceAvailableException {
 
 
-		// check first whether we have a resolved root slot which we can use, using STRICT resType matching EDFSchedulingStrategy
+		// check first whether we have a resolved root slot which we can use, using STRICT resType matching HEDFSchedulingStrategy
 		SlotSharingManager.MultiTaskSlotLocality multiTaskSlotLocality = slotSharingManager.getResolvedRootSlot(
 			groupId,
 			schedulingStrategy,

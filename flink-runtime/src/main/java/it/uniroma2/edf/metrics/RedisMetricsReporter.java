@@ -36,22 +36,12 @@ public class RedisMetricsReporter implements MetricReporter, Scheduled {
 	@Override
 	public void open(MetricConfig metricConfig) {
 
-		//jedis = new Jedis("localhost", 6379);
-		//jedis = new Jedis("ec2-3-128-94-177.us-east-2.compute.amazonaws.com", 6379);
+
 		String redisHostname = metricConfig.getString(CONF_REDIS_HOST, "localhost");
 		int redisPort = metricConfig.getInteger(CONF_REDIS_PORT, 6379);
 		jedis = new Jedis(redisHostname, redisPort);
 		publishOnRedis = true;
 		if (jedis != null) EDFLogger.log("EDF: Redis Metric Reporter Connected to Redis!", LogLevel.INFO, RedisMetricsReporter.class);
-		/*
-		String redisHostname = metricConfig.getString(CONF_REDIS_HOST, "");
-		publishOnRedis = !redisHostname.isEmpty();
-		if (publishOnRedis) {
-			int redisPort = metricConfig.getInteger(CONF_REDIS_PORT, 6379);
-			jedis = new Jedis(redisHostname, redisPort);
-		}
-		*/
-		//logEverything = metricConfig.getBoolean(CONF_LOG_EVERYTHING, false);
 
 
 	}
@@ -228,15 +218,6 @@ public class RedisMetricsReporter implements MetricReporter, Scheduled {
 		// source_subtask_index.<src_subtask>.operator_id.<operatorid>.operator_subtask_id.<subtaskid>.<metric>
 		String fields[] = metricId.split("\\.");
 
-		/*
-		EDFLogger.log("EDF: metricId " + metricId, LogLevel.INFO, RedisMetricsReporter.class);
-		for (String field: fields){
-			EDFLogger.log("EDF: campo dell latenza :" + field, LogLevel.INFO, RedisMetricsReporter.class);
-		}
-
-		 */
-
-
 		final String jobId = fields[3];
 		final String sourceId = fields[6];
 		String operator;
@@ -253,7 +234,7 @@ public class RedisMetricsReporter implements MetricReporter, Scheduled {
 			subtaskId = fields[12];
 		}
 
-		EDFLogger.log("HEDF: latency " + stats.getMean() + ", operator "+ operator +", subtask"+subtaskId, LogLevel.INFO, RedisMetricsReporter.class);
+		//EDFLogger.log("HEDF: latency " + stats.getMean() + ", operator "+ operator +", subtask"+subtaskId, LogLevel.INFO, RedisMetricsReporter.class);
 
 		if (publishOnRedis) {
 			//String key = String.format("latency.%s.%s.%s.%s.%s", jobId, sourceId, sourceSubtaskId, operator, subtaskId);

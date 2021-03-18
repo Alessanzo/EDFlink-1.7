@@ -11,7 +11,8 @@ import it.uniroma2.dspsim.dsp.edf.om.threshold.MaxSpeedupThresholdPolicy;
 import it.uniroma2.dspsim.dsp.edf.om.threshold.MinCostThresholdPolicy;
 import it.uniroma2.dspsim.dsp.edf.om.threshold.RandomSelectionThresholdPolicy;
 import it.uniroma2.dspsim.dsp.edf.om.threshold.ThresholdPolicy;
-
+/*new Threshold Based extension that gives the possibility of choosing among 3 threshold policies configurable from
+* config.policies, and overrides reconfiguration method to apply the threshold policy selected */
 public class HEDFlinkThresholdBasedOM extends ThresholdBasedOM {
 
 	public static final String THRESHOLD_POLICY = "edf.om.threshold.policy";

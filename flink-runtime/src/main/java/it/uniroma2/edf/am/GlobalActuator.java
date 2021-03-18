@@ -30,21 +30,15 @@ public class GlobalActuator {
 			String scalingJob = "";
 
 			for (JobVertex vertex : jobGraph.getVerticesSortedTopologicallyFromSources()){
-
 				scalingJob += "," + vertex.getID().toString() + "," + vertex.getParallelism();
 
 			}
-
-			//this.producer.send(new ProducerRecord(EflinkConfig.SCALE_RESPONSE_TOPIC,"-1" + scaling
-			//	Job));
 
 			String response = scaleOperators(dispatcher,jobGraph,requests)? "0":"1";
 
 			for (JobVertex vertex : jobGraph.getVerticesSortedTopologicallyFromSources()){
 				response += "," + vertex.getID().toString() + "," + vertex.getParallelism();
 			}
-
-			//this.producer.send(new ProducerRecord(EflinkConfig.SCALE_RESPONSE_TOPIC,response));
 
 		}
 
@@ -53,16 +47,14 @@ public class GlobalActuator {
 
 
 	private boolean scaleOperators(Dispatcher dispatcher, JobGraph jobGraph, Map<String, Integer>
-		requests){
-
+		requests) {
 
 		try {
 
 			long start = System.currentTimeMillis();
 
 
-			EDFLogger.log("Application Manager try to rescale operators " +
-
+			EDFLogger.log("HEDF: Try to rescale Operators " +
 				requests.toString() + " at: " + start, LogLevel.INFO,GlobalActuator.class);
 
 
@@ -74,13 +66,13 @@ public class GlobalActuator {
 			//try to apply rescaling
 			rescaleFuture.get();
 			long stop = System.currentTimeMillis();
-			EDFLogger.log("Application Manager rescaled operators " + requests.toString() + " in: " + (stop-start) + " ms", LogLevel.INFO,GlobalActuator.class);
+			EDFLogger.log("HEDF:  Rescaled operators " + requests.toString() + " in: " + (stop-start) + " ms", LogLevel.INFO,GlobalActuator.class);
 			EDFLogger.log(jobGraph.getJobID().toString()+",scaled job," + (stop-start), LogLevel.DEBUG,GlobalActuator.class);
 			return true;
 		} catch (InterruptedException e) {
-				EDFLogger.log("Could not rescale operators: " + requests.toString() + " " + e.getMessage(), LogLevel.WARN,GlobalActuator.class);
+				EDFLogger.log("HEDF: Could not rescale operators: " + requests.toString() + " " + e.getMessage(), LogLevel.WARN,GlobalActuator.class);
 		} catch (ExecutionException e) {
-				EDFLogger.log("Could not rescale operators: " + requests.toString() + " " + e.getMessage(), LogLevel.WARN,GlobalActuator.class);
+				EDFLogger.log("HEDF: Could not rescale operators: " + requests.toString() + " " + e.getMessage(), LogLevel.WARN,GlobalActuator.class);
 		}
 		return false;
 	}

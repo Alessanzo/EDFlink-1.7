@@ -20,25 +20,24 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.Set;
 
+/*Class that creates an Application object based on the real DAG structure of the Job to execute. Application is used by policies
+* to calculate scaling decisions*/
 public class HEDFlinkAppBuilder extends ApplicationBuilder {
 
 	static public Application buildApplication(JobGraph jobGraph){
 		Application app = new Application();
-		double muScalingFactor = 1.0;
 		HashMap<String, Operator> names2operators = new HashMap<>();
 
-		final double mu = 6.0 * muScalingFactor;
-		final double serviceTimeMean = 1/mu;
-		final double serviceTimeVariance = 1.0/mu*1.0/mu/2.0;
 
 		Configuration conf = HEDFlinkConfiguration.getEDFlinkConfInstance();
 		//creating Application Operators and adding them to it, with same Name as JobVertexes
 		final int maxParallelism = conf.getInteger(ConfigurationKeys.OPERATOR_MAX_PARALLELISM_KEY, 5);
-		EDFLogger.log("EDF: Operator Max Parallelism " + maxParallelism, LogLevel.INFO, HEDFlinkAppBuilder.class);
+		EDFLogger.log("HEDF: Operator Max Parallelism: " + maxParallelism, LogLevel.INFO, HEDFlinkAppBuilder.class);
+		//service time mean and variance for each intermediate operator is taken by config.properties
 		String[] operatorsServiceStats= conf.getString("simulation.service.stats", "").split(",");
 		int operatorNum = JobGraphUtils.listOperators(jobGraph, true, true).size();
 		double[] serviceStats = new double[2*operatorNum];
-		if (operatorsServiceStats.length < (2* operatorNum)){
+		if (operatorsServiceStats.length < (2* operatorNum)){ //if number of times passed is wrong, default parameters are used
 			for (int i=0;i<2*operatorNum;i = i+2){
 				serviceStats[i] = 0.25;
 				serviceStats[i+1] = 0.0;
@@ -60,10 +59,13 @@ public class HEDFlinkAppBuilder extends ApplicationBuilder {
 		int ops = 0;
 		for (JobVertex operator: JobGraphUtils.listSortedTopologicallyOperators(jobGraph, true, true)){
 
+			//creating operators
 			Operator appOp = new HEDFlinkOperator(operator, operator.getName(),
 					new MG1OperatorQueueModel(serviceStats[ops], serviceStats[ops+1]), maxParallelism);
-			EDFLogger.log("EDF: Operator "+ operator.getName() +" with service time mean "+ serviceStats[ops]+
-				" and variance "+serviceStats[ops+1], LogLevel.INFO, HEDFlinkAppBuilder.class);
+
+			EDFLogger.log("HEDF: Operator "+ operator.getName() +" with service time mean: "+ serviceStats[ops]+
+				" and variance: "+serviceStats[ops+1], LogLevel.INFO, HEDFlinkAppBuilder.class);
+
 			ops = ops +2;
 			app.addOperator(appOp);
 			names2operators.put(operator.getName(), appOp);
@@ -81,9 +83,9 @@ public class HEDFlinkAppBuilder extends ApplicationBuilder {
 		}
 		Collection<ArrayList<Operator>> paths = app.getAllPaths();
 		for (ArrayList<Operator> path: paths){
-			EDFLogger.log("Path Start: ", LogLevel.INFO, HEDFlink.class);
+			EDFLogger.log("HEDF: Path Start: ", LogLevel.INFO, HEDFlink.class);
 			for (Operator pathoperator: path){
-				EDFLogger.log("Operator in the path: "+pathoperator.getName(), LogLevel.INFO, HEDFlink.class);
+				EDFLogger.log("HEDF: Operator in the path: "+pathoperator.getName(), LogLevel.INFO, HEDFlink.class);
 			}
 		}
 		computeOperatorsSLO(app);

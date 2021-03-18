@@ -10,16 +10,17 @@ import it.uniroma2.dspsim.stats.metrics.RealValuedMetric;
 
 import java.io.*;
 
+/*Class that updates execution, resources, cost and scaling stats stats */
 public class HEDFlinkStatistics extends Statistics {
 
-	final String STAT_LATENCY_VIOLATIONS = "Violations";
-	final String STAT_RECONFIGURATIONS = "Reconfigurations";
-	final String STAT_RESOURCES_COST = "ResourcesCost";
-	final String STAT_APPLICATION_COST_AVG = "AvgCost";
+	final String STAT_LATENCY_VIOLATIONS = "Violations"; //SLO violations num
+	final String STAT_RECONFIGURATIONS = "Reconfigurations"; //reconfigurations num
+	final String STAT_RESOURCES_COST = "ResourcesCost"; //total resources cost
+	final String STAT_APPLICATION_COST_AVG = "AvgCost"; //averate iteration cost (res+viol+reconf)
 	final String STAT_DESIRED_OP_RECONFIGURATIONS = "DesOpReconf";
 	final String STAT_NEWPLACEMENT_OP_MISCONF = "NewPlacementMisconf";
-	final String STAT_OP_MISCONF = "ReplacementMisconf";
-	final String STAT_DESIRED_RECONFIGURATIONS = "DesReconf";
+	final String STAT_OP_MISCONF = "ReplacementMisconf";  //reconfigurations not on desired resType
+	final String STAT_DESIRED_RECONFIGURATIONS = "DesReconf"; //reconfigurations on desired resType
 	final String STAT_INSTANCES_TYPES = "InstanceType";
 
 	final File statsOutput;

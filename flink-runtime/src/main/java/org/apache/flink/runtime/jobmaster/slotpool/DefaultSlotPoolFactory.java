@@ -18,8 +18,8 @@
 
 package org.apache.flink.runtime.jobmaster.slotpool;
 
+import it.uniroma2.edf.HEDFSchedulingStrategy;
 import it.uniroma2.edf.utils.EDFLogger;
-import it.uniroma2.edf.EDFSchedulingStrategy;
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.time.Time;
 import org.apache.flink.configuration.Configuration;
@@ -96,7 +96,7 @@ public class DefaultSlotPoolFactory implements SlotPoolFactory {
 
 	private static SchedulingStrategy selectSchedulingStrategy(Configuration configuration) {
 		EDFLogger.log("HEDF Instancing HEDFSchedulingStrategy", LogLevel.INFO, DefaultSlotPoolFactory.class);
-		return EDFSchedulingStrategy.getInstance();
+		return HEDFSchedulingStrategy.getInstance();
 		/*
 		if (configuration.getBoolean(CheckpointingOptions.LOCAL_RECOVERY)) {
 			return PreviousAllocationSchedulingStrategy.getInstance();

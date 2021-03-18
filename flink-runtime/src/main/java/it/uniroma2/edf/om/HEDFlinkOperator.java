@@ -8,6 +8,8 @@ import it.uniroma2.edf.monitor.OperatorMonitor;
 import org.apache.flink.runtime.jobgraph.JobVertex;
 import org.apache.flink.shaded.netty4.io.netty.handler.logging.LogLevel;
 
+/*Class that extends simulator Operator to calculate response time from real data rather than simulated
+* Interacts with Operator Monitor*/
 public class HEDFlinkOperator extends Operator {
 
 	protected ApplicationMonitorOld appMonitor;
@@ -26,10 +28,8 @@ public class HEDFlinkOperator extends Operator {
 
 	@Override
 	public double responseTime(double inputRate) {
-		//double operatorLatency = appMonitor.getAvgOperatorLatency(vertex);
-		//double procTime = appMonitor.getAvgOperatorProcessingTime(vertex);
-		double operatorLatency = opMonitor.getAvgOperatorLatency(vertex);
-		double procTime = opMonitor.getAvgOperatorProcessingTime(vertex);
+		double operatorLatency = opMonitor.getAvgOperatorLatency(vertex); //monitor operator latency
+		double procTime = opMonitor.getAvgOperatorProcessingTime(vertex); //monitor operator proc time
 		double opRespTime = (operatorLatency+procTime) / 1000;
 		EDFLogger.log("EDF: metodo overridden invocato. Latenza operatore: "+ opRespTime
 			+", SLO operatore: "+getSloRespTime(), LogLevel.INFO, HEDFlinkOperator.class);

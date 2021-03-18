@@ -17,9 +17,12 @@ import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.EDFOptions;
 import org.apache.flink.shaded.netty4.io.netty.handler.logging.LogLevel;
 
+/*Inferior level control cycle thread that has the responsibility to monitor operator data and interact with
+* scaling policies to calculate reconfiguration requests. Then it shares them with HEDFlinkAM. Wraps Operator Manager
+*  and uses it to calculate rescaling through its policy*/
 public class HEDFlinkOperatorManager implements Runnable{
 
-	protected OperatorManager wrappedOM;
+	protected OperatorManager wrappedOM; //policies hierarchy class wrapped
 	protected ApplicationMonitorOld appMonitor;
 	protected OperatorMonitor opMonitor;
 	protected OMRequest reconfRequest = null;
@@ -42,7 +45,9 @@ public class HEDFlinkOperatorManager implements Runnable{
 				Thread.sleep(omInterval*1000);
 			} catch (InterruptedException e) {
 			}
+			//operator monitor input rate and cpu usage
 			OMMonitoringInfo monitoringInfo = getIrAndUtilization(wrappedOM.getOperator());
+			//interaction with HEDFlink Operator Manager to calculate rescaling request
 			this.reconfRequest = wrappedOM.pickReconfigurationRequest(monitoringInfo);
 			reconf = reconfRequest.getRequestedReconfiguration().toString();
 
@@ -50,7 +55,7 @@ public class HEDFlinkOperatorManager implements Runnable{
 					" monitored Input Rate: "+monitoringInfo.getInputRate()+ " and CPUUsage: "
 					+ monitoringInfo.getCpuUtilization()+ " and decided this Reconfiguration Request: "+ reconf
 				, LogLevel.INFO, HEDFlinkOperatorManager.class);
-
+			//waits for Operator info to be reconfigured by EDFlinkAM after rescaling, before starting with a new cycle
 			waitReconfigured();
 
 			EDFLogger.log("HEDF: "+ getWrappedOM().getOperator().getName()+" reconfiguration completed"
@@ -58,6 +63,7 @@ public class HEDFlinkOperatorManager implements Runnable{
 		}
 	}
 
+	//synchronization with EDFlinkAM to wait for reconfiguration completion and Operator structure update
 	public void waitReconfigured() {
 		while (!recofigured) {
 			synchronized (this) {
@@ -72,12 +78,14 @@ public class HEDFlinkOperatorManager implements Runnable{
 		recofigured = false;
 	}
 
+	//interaction with Operator Monitor
 	public OMMonitoringInfo getIrAndUtilization(Operator operator){
 		String operatorName = operator.getName();
 		int currentParallelism = operator.getInstances().size();
 		return opMonitor.getOMMonitoringInfo(operatorName, currentParallelism);
 	}
 
+	//method used by HEDFlinkAM to fetch posted reconfiguration request
 	public OMRequest getReconfRequest() {
 		OMRequest newRequest;
 		if (reconfRequest != null)
@@ -89,6 +97,7 @@ public class HEDFlinkOperatorManager implements Runnable{
 		return newRequest;
 	}
 
+	//method used by HEDFlinkAM to notify completed reconfiguration
 	public void notifyReconfigured() {
 		recofigured = true;
 		synchronized (this) {
@@ -100,49 +109,4 @@ public class HEDFlinkOperatorManager implements Runnable{
 		return wrappedOM;
 	}
 
-	public void run2(){
-		int i = 0;
-		String reconf = "(do nothing)";
-		while (true) {
-			try {
-				//Thread.sleep(amInterval*1000);
-				Thread.sleep(10000);
-			} catch (InterruptedException e) {
-			}
-			double operatorInputRate = appMonitor.getOperatorInputRate(wrappedOM.getOperator().getName());
-			EDFLogger.log("EDF: EDFLINKOM monitored for Operator "+getWrappedOM().getOperator().getName()+
-				" this Input Rate: "+operatorInputRate, LogLevel.INFO, HEDFlinkOperatorManager.class);
-			final double u = wrappedOM.getOperator().utilization(operatorInputRate);
-			OMMonitoringInfo monitoringInfo = new OMMonitoringInfo();
-			monitoringInfo.setInputRate(operatorInputRate);
-			monitoringInfo.setCpuUtilization(u);
-
-			if (reconf.equals("(do nothing)") || i<=1){
-				OMRequest reconfReq = wrappedOM.pickReconfigurationRequest(monitoringInfo);
-				NodeType[] nodeTypes = reconfReq.getRequestedReconfiguration().getInstancesToAdd();
-				NodeType[] enlargedNodeTypes;
-				if (i==0) {
-					if (nodeTypes != null) {
-						enlargedNodeTypes = new NodeType[]{nodeTypes[0], nodeTypes[0]};
-						reconfReq = new RewardBasedOMRequest(Reconfiguration.scaleOut(enlargedNodeTypes), new QBasedReconfigurationScore(0), new QBasedReconfigurationScore(0));
-					}
-				}
-				if (i==1) {
-					enlargedNodeTypes = new NodeType[]{ComputingInfrastructure.getInfrastructure().getNodeTypes()[1]};
-					reconfReq = new RewardBasedOMRequest(Reconfiguration.scaleIn(enlargedNodeTypes), new QBasedReconfigurationScore(0), new QBasedReconfigurationScore(0));
-				}
-				this.reconfRequest = reconfReq;
-				//this.reconfRequest = wrappedOM.pickReconfigurationRequest(monitoringInfo);
-				reconf = reconfRequest.getRequestedReconfiguration().toString();
-				EDFLogger.log("EDF: EDFLINKOM for Operator "+getWrappedOM().getOperator().getName()+
-						" decided this Reconfiguration Request: "+ reconf
-					, LogLevel.INFO, HEDFlinkOperatorManager.class);
-
-				if (!reconf.equals("(do nothing)"))
-					i++;
-			}
-			waitReconfigured();
-			EDFLogger.log("EDF: EDFLINKOM waited for reconfiguration", LogLevel.INFO, HEDFlinkOperatorManager.class);
-		}
-	}
 }

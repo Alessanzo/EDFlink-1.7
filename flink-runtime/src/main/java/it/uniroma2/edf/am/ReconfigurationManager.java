@@ -13,8 +13,10 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
+/*AM component that checks requests*/
 public class ReconfigurationManager {
 
+	//requests are accepted
 	public Map<Operator, Reconfiguration> acceptRequests(Map<OperatorManager, OMRequest> omRequestMap) {
 		Map<Operator, Reconfiguration> reconfigurations = new HashMap<>(omRequestMap.size());
 
@@ -29,6 +31,7 @@ public class ReconfigurationManager {
 		return reconfigurations;
 	}
 
+	//reconfiguration requests are adapted to the request map and resTypes list in JobGraph used in scheduling and scaling
 	public void fillDesiredSchedulingReconf(Map<Operator, Reconfiguration> reconfigurations, JobGraph jobGraph, Map<String, Integer> request,
 											Map<String, JobVertexID> perOperatorNameID){
 		request.clear();
@@ -40,19 +43,19 @@ public class ReconfigurationManager {
 			int resTypeToModify;
 			if (opReconf.getInstancesToAdd() != null) {
 				for (NodeType nodeTypeToModify: opReconf.getInstancesToAdd()){
-					resTypeToModify = nodeTypeToModify.getIndex();
-					jobGraph.getTaskResTypes().get(operatorID).add(resTypeToModify);
+					resTypeToModify = nodeTypeToModify.getIndex(); //get resType desired for replica to add
+					jobGraph.getTaskResTypes().get(operatorID).add(resTypeToModify); //specify new resType in the list used at scheduling time
 					newParallelism ++;
 				}
-				request.put(operatorID.toString(), newParallelism);
+				request.put(operatorID.toString(), newParallelism); //change number of replicas to scale
 			}
 			else if (reconf.getValue().getInstancesToRemove() != null) {
 				for (NodeType nodeTypeToModify: opReconf.getInstancesToRemove()){
-					resTypeToModify = nodeTypeToModify.getIndex();
-					jobGraph.getTaskResTypes().get(operatorID).remove(Integer.valueOf(resTypeToModify));
+					resTypeToModify = nodeTypeToModify.getIndex(); //get resType of replica to remove
+					jobGraph.getTaskResTypes().get(operatorID).remove(Integer.valueOf(resTypeToModify)); //remove replica for next scheduling
 					newParallelism --;
 				}
-				request.put(operatorID.toString(), newParallelism);
+				request.put(operatorID.toString(), newParallelism); //change number of replicas to scale
 			}
 		}
 	}
