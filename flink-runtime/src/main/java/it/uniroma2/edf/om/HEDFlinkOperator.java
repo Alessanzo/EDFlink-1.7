@@ -31,8 +31,8 @@ public class HEDFlinkOperator extends Operator {
 		double operatorLatency = opMonitor.getAvgOperatorLatency(vertex); //monitor operator latency
 		double procTime = opMonitor.getAvgOperatorProcessingTime(vertex); //monitor operator proc time
 		double opRespTime = (operatorLatency+procTime) / 1000;
-		EDFLogger.log("EDF: metodo overridden invocato. Latenza operatore: "+ opRespTime
-			+", SLO operatore: "+getSloRespTime(), LogLevel.INFO, HEDFlinkOperator.class);
+		//EDFLogger.log("HEDF: Operatore latency: "+ opRespTime
+		//	+", operator SLO: "+getSloRespTime(), LogLevel.INFO, HEDFlinkOperator.class);
 		return opRespTime;
 	}
 }

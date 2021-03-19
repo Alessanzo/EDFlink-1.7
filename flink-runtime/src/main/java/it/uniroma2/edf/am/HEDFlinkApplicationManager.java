@@ -94,7 +94,7 @@ public class HEDFlinkApplicationManager extends ApplicationManager implements Ru
 		this.amInterval = config.getInteger(EDFOptions.AM_INTERVAL_SECS);
 		this.roundsBetweenPlanning = config.getInteger(EDFOptions.AM_ROUNDS_BEFORE_PLANNING);
 
-		EDFLogger.log("EDF: AM Interval: "+ amInterval+", OM Interval: "+
+		EDFLogger.log("HEDF: AM Interval: "+ amInterval+", OM Interval: "+
 				config.getLong(EDFOptions.EDF_OM_INTERVAL_SECS)+", Rounds Before Planning: " + roundsBetweenPlanning,
 			LogLevel.INFO, HEDFlinkApplicationManager.class);
 
@@ -120,7 +120,7 @@ public class HEDFlinkApplicationManager extends ApplicationManager implements Ru
 		this.wReconf = conf.getDouble(ConfigurationKeys.RL_OM_RECONFIG_WEIGHT_KEY, 0.33);
 		this.wRes = conf.getDouble(ConfigurationKeys.RL_OM_RESOURCES_WEIGHT_KEY, 0.33);
 
-		logger.info("SLO latency: {}", LATENCY_SLO);
+		logger.info("HEDF: SLO latency: {}", LATENCY_SLO);
 
 	}
 
@@ -148,7 +148,7 @@ public class HEDFlinkApplicationManager extends ApplicationManager implements Ru
 			//executing while Job is RUNNING
 			CompletableFuture<JobStatus> jobStatusFuture = dispatcher.requestJobStatus(jobGraph.getJobID(), Time.seconds(3));
 			try {
-				EDFLogger.log("HEDF: GETTING JOB STATUS!", LogLevel.INFO, HEDFlinkApplicationManager.class);
+				//EDFLogger.log("HEDF: GETTING JOB STATUS!", LogLevel.INFO, HEDFlinkApplicationManager.class);
 				JobStatus jobStatus = jobStatusFuture.get();
 				if (jobStatus == JobStatus.FAILED || jobStatus == JobStatus.CANCELED || jobStatus == JobStatus.CANCELLING) {
 					EDFLogger.log("HEDF: CLOSING", LogLevel.INFO, HEDFlinkApplicationManager.class);
@@ -212,7 +212,7 @@ public class HEDFlinkApplicationManager extends ApplicationManager implements Ru
 	protected double monitor() {
 		//Latencies print for experimentation
 		double endToEndLatency = appMonitor.endToEndLatency() / 1000;
-		EDFLogger.log("HEDF: Simulation-Like EndToEndLatency: " + endToEndLatency,
+		EDFLogger.log("HEDF: end-to-end Latency: " + endToEndLatency,
 			LogLevel.INFO, HEDFlinkApplicationManager.class);
 
 
